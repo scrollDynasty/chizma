@@ -54,6 +54,33 @@ jobs:
           uv export --no-dev --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
           uv run pip-audit -r "$RUNNER_TEMP/requirements.txt" --disable-pip --require-hashes
 
+  e2e:
+    name: E2E (browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: pnpm e2e
+        working-directory: apps/web
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
   docker:
     name: Docker images build
     runs-on: ubuntu-latest
