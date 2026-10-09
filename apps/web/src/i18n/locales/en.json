@@ -1,0 +1,14 @@
+{
+  "tagline": "Draw a website. Get a real one.",
+  "description": "Sketch anything: a house, a sun, a few boxes. Chizma turns your drawing into a working website.",
+  "createSite": "Create a site",
+  "comingSoon": "The canvas arrives in the next milestone",
+  "templates": "Templates",
+  "templatesSoon": "The template gallery is coming soon.",
+  "api": {
+    "checking": "Checking server…",
+    "ok": "Server: ok",
+    "down": "Server unavailable"
+  },
+  "language": "Language"
+}

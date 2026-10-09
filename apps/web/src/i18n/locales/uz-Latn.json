@@ -1,0 +1,14 @@
+{
+  "tagline": "Saytni chizing. Haqiqiysini oling.",
+  "description": "Istalgan narsani chizing: uy, quyosh, bir nechta to‘rtburchak. Chizma chizmangizni ishlaydigan saytga aylantiradi.",
+  "createSite": "Sayt yaratish",
+  "comingSoon": "Chizish maydoni keyingi bosqichda",
+  "templates": "Shablonlar",
+  "templatesSoon": "Shablonlar galereyasi tez orada.",
+  "api": {
+    "checking": "Server tekshirilmoqda…",
+    "ok": "Server: ishlayapti",
+    "down": "Server mavjud emas"
+  },
+  "language": "Til"
+}
