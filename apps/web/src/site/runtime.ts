@@ -4,7 +4,7 @@
  * builds every piece of UI with textContent, never innerHTML. Generated block code has no
  * scripts at all; the page CSP only allows this script (by nonce).
  */
-export const RUNTIME_JS = `(() => {
+export const RUNTIME_JS = String.raw`(() => {
   "use strict";
   const root = document.documentElement;
   const api = root.dataset.chzApi || "";
@@ -110,10 +110,18 @@ export const RUNTIME_JS = `(() => {
     }
   }
 
+  const SAFE_URL = /^(https?:\/\/[^\s<>"']+|mailto:[^\s<>"']+|tel:\+?[0-9 ()-]{3,30})$/i;
+  const valid = (a) =>
+    a && (a.type === "link" ? typeof a.url === "string" && SAFE_URL.test(a.url)
+      : a.type === "modal" || a.type === "toggle" || a.type === "scroll");
+
   document.addEventListener("click", (event) => {
-    const cell = event.target.closest("[data-chz-action]");
-    if (!cell) return;
+    // Only the block cell carries an action; markup inside a block cannot add its own.
+    const cell = event.target.closest(".chz-cell");
+    if (!cell || !cell.dataset.chzAction) return;
     event.preventDefault();
-    try { run(JSON.parse(cell.dataset.chzAction)); } catch (_) {}
+    let action = null;
+    try { action = JSON.parse(cell.dataset.chzAction); } catch (_) { return; }
+    if (valid(action)) run(action);
   });
 })();`;

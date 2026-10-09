@@ -1,4 +1,5 @@
 import type { Action } from "@/actions/types";
+import { safeCss } from "@/preview/sandbox";
 import { RUNTIME_JS } from "./runtime";
 
 /**
@@ -127,11 +128,16 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1c1
 @media (max-width:700px){
   .chz-page{padding:16px 16px 40px}
   .chz-row{grid-template-columns:1fr!important;margin-top:16px!important;gap:16px}
+  .chz-row>*{grid-column:1!important}
   .chz-spacer{display:none}
   .chz-cell{width:min(100%,var(--w));justify-self:center;min-height:calc(var(--h)*var(--keep))}
 }`;
 
-export function buildSite(blocks: readonly SiteBlock[], options: SiteOptions): string {
+const SAFE_ID = /^[\w-]{1,80}$/;
+
+export function buildSite(allBlocks: readonly SiteBlock[], options: SiteOptions): string {
+  // Ids end up in selectors and attributes: only plain ids are accepted.
+  const blocks = allBlocks.filter((b) => SAFE_ID.test(b.id));
   const rows = siteRows(blocks);
   const hidden = hiddenAtStart(blocks);
   let previousBottom = 0;
@@ -142,11 +148,16 @@ export function buildSite(blocks: readonly SiteBlock[], options: SiteOptions): s
     previousBottom = row.bottom;
     const marginTop = ((gap / options.pageWidth) * 100).toFixed(3);
     let index = 0;
-    const cells = columns.map((column) => {
-      if (column.startsWith("spacer:")) return '<div class="chz-spacer" aria-hidden="true"></div>';
+    // Every cell is pinned to its column, so hiding one never shifts its neighbours.
+    const cells = columns.map((column, columnIndex) => {
+      const track = `grid-column:${columnIndex + 1}`;
+      if (column.startsWith("spacer:")) {
+        return `<div class="chz-spacer" style="${track}" aria-hidden="true"></div>`;
+      }
       const block = row.items[index++] as SiteBlock;
       const picture = PICTURES.has(block.kind.toLowerCase());
       const style = [
+        track,
         `aspect-ratio:${Math.round(block.width)}/${Math.max(Math.round(block.height), 1)}`,
         `--w:${Math.round(block.width)}px`,
         `--h:${Math.round(block.height)}px`,
@@ -164,7 +175,7 @@ export function buildSite(blocks: readonly SiteBlock[], options: SiteOptions): s
 
   const blockCss = blocks
     .filter((b) => b.css.trim())
-    .map((b) => `[data-el="${b.id}"]{${b.css.replace(/<\/?style/gi, "")}}`)
+    .map((b) => `[data-el="${b.id}"]{${safeCss(b.css)}}`)
     .join("\n");
   const submit =
     options.submit.mode === "api"

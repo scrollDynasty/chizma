@@ -43,3 +43,54 @@ export function isValidAction(action: Action, blockIds: ReadonlySet<string>): bo
       return blockIds.has(action.target_id);
   }
 }
+
+/** Accepts only well-formed actions from untrusted data (drafts, pasted scenes). */
+export function parseAction(value: unknown): Action | null {
+  if (!value || typeof value !== "object") return null;
+  const a = value as Record<string, unknown>;
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+  switch (a.type) {
+    case "link":
+      return typeof a.url === "string" && isSafeUrl(a.url)
+        ? { type: "link", url: a.url.trim(), new_tab: a.new_tab !== false }
+        : null;
+    case "modal": {
+      const form = a.form as Record<string, unknown> | null | undefined;
+      const fields = Array.isArray(form?.fields)
+        ? (form.fields as Record<string, unknown>[])
+            .filter((f) => typeof f?.name === "string" && /^[a-z][a-z0-9_]{0,30}$/.test(f.name))
+            .slice(0, 8)
+            .map((f) => ({
+              name: f.name as string,
+              label: text(f.label, 60),
+              type: (["text", "tel", "email", "textarea"].includes(f.type as string)
+                ? f.type
+                : "text") as FieldType,
+              required: f.required !== false,
+            }))
+        : [];
+      return {
+        type: "modal",
+        title: text(a.title, 80),
+        text: text(a.text, 1000),
+        form:
+          form && fields.length > 0
+            ? {
+                fields,
+                submit_label: text(form.submit_label, 40),
+                success_text: text(form.success_text, 200),
+                id: typeof form.id === "string" && /^[a-f0-9]{16}$/.test(form.id) ? form.id : null,
+              }
+            : null,
+      };
+    }
+    case "toggle":
+    case "scroll":
+      if (typeof a.target_id !== "string" || !/^[\w-]{1,80}$/.test(a.target_id)) return null;
+      return a.type === "toggle"
+        ? { type: "toggle", target_id: a.target_id, start_hidden: a.start_hidden !== false }
+        : { type: "scroll", target_id: a.target_id };
+    default:
+      return null;
+  }
+}

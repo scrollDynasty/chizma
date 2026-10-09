@@ -75,7 +75,8 @@ class Settings(BaseSettings):
         """Sign-in works only with a real JWT secret outside development and tests."""
         secret = self.jwt_secret.get_secret_value()
         if self.env == "production":
-            return secret != DEV_JWT_SECRET and len(secret) >= 32
+            placeholder = "replace-me" in secret.lower() or secret == DEV_JWT_SECRET
+            return not placeholder and len(secret) >= 32
         return bool(secret)
 
     def oauth_providers(self) -> list[str]:

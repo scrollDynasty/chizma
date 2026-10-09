@@ -87,4 +87,15 @@ describe("buildSite", () => {
     expect(published).toContain('data-chz-api="https://api.example"');
     expect(published).toContain("connect-src https://api.example");
   });
+
+  it("pins cells to their columns so hidden blocks do not shift their neighbours", () => {
+    const left = block("left", "button", 100, 100, 200, 60, {
+      action: { type: "toggle", target_id: "mid", start_hidden: true },
+    });
+    const mid = block("mid", "text", 400, 100, 200, 60);
+    const right = block("right", "text", 700, 100, 200, 60);
+    const row = buildSite([left, mid, right], options);
+
+    expect(row).toMatch(/data-el="right" style="grid-column:6;/);
+  });
 });

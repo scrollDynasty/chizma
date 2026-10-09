@@ -19,6 +19,7 @@ router = APIRouter(prefix="/v1/forms", tags=["forms"])
 MAX_VALUE_LENGTH = 2000
 MAX_SUBMISSIONS_PER_MINUTE = 5
 HONEYPOT = "_hp"
+MAX_FORMS_PER_USER = 50
 
 
 class FormIn(BaseModel):
@@ -58,6 +59,8 @@ class SubmitLimiter:
 
     def allow(self, key: str, now: float | None = None) -> bool:
         current = now if now is not None else time.monotonic()
+        if len(self._hits) > 10_000:  # forget idle clients so memory stays bounded
+            self._hits = {k: v for k, v in self._hits.items() if v and current - v[-1] < 60}
         recent = [t for t in self._hits.get(key, []) if current - t < 60]
         allowed = len(recent) < self.per_minute
         if allowed:
@@ -67,8 +70,14 @@ class SubmitLimiter:
 
 
 def _client_key(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    host = forwarded.split(",")[0].strip() or (request.client.host if request.client else "")
+    """The address added by our own proxy (last X-Forwarded-For entry); earlier entries are
+    whatever the client claims and must not be trusted."""
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",")]
+    host = forwarded[-1] if forwarded and forwarded[-1] else ""
+    if not host:
+        host = request.client.host if request.client else ""
+    if host.count(":") == 1:  # "ip:port" from App Service; IPv6 has more colons
+        host = host.split(":")[0]
     return host or "unknown"
 
 
@@ -91,6 +100,9 @@ def _out(form: Form, count: int) -> FormOut:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_form(body: FormIn, user: CurrentUser, db: DbDep) -> FormOut:
+    owned = db.scalar(select(func.count()).select_from(Form).where(Form.owner_id == user.id))
+    if (owned or 0) >= MAX_FORMS_PER_USER:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too_many_forms")
     form = Form(
         id=secrets.token_hex(8),
         owner_id=user.id,
@@ -136,6 +148,8 @@ def list_submissions(form_id: str, user: CurrentUser, db: DbDep) -> list[Submiss
 @router.post("/{form_id}/submissions", status_code=status.HTTP_201_CREATED)
 def submit(form_id: str, body: dict[str, str], request: Request, db: DbDep) -> SubmitOut:
     """Public: called by the published site. Unknown fields are dropped."""
+    if len(body) > 20:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "too_many_fields")
     form = db.get(Form, form_id)
     if form is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")

@@ -1,4 +1,4 @@
-import type { Action } from "@/actions/types";
+import { type Action, parseAction } from "@/actions/types";
 import type { Block, SceneElement, SceneGraph } from "@/lib/scene";
 
 /**
@@ -73,7 +73,7 @@ export function blockDataOf(element: WithCustomData): BlockData | null {
     versions,
     current,
     question: data.question ?? null,
-    action: data.action ?? null,
+    action: parseAction(data.action),
   };
 }
 

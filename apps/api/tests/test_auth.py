@@ -149,3 +149,21 @@ def test_test_login_only_exists_in_test_env(client_factory: Callable[..., TestCl
     response = test_env.post("/v1/auth/test-login", json={"login": "e2e"})
     assert response.status_code == 200
     assert response.json()["user"]["provider"] == "test"
+
+
+def test_tokens_stop_working_when_user_leaves_the_allow_list(
+    client_factory: Callable[..., TestClient],
+) -> None:
+    open_client = client_factory()
+    token = exchange(open_client, sign_in(open_client)["code"])["access_token"]
+    closed = client_factory(allowed_users="github:someone-else")
+
+    assert closed.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+def test_placeholder_secret_disables_sign_in_in_production(
+    client_factory: Callable[..., TestClient],
+) -> None:
+    client = client_factory(env="production", jwt_secret="replace-me-with-a-long-random-string")
+
+    assert client.get("/v1/auth/providers").json() == {"providers": []}
