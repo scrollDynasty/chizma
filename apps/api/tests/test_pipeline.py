@@ -4,7 +4,7 @@ import pytest
 
 from chizma_api.generation.fake import FakeProvider
 from chizma_api.generation.pipeline import InvalidModelOutputError, run_pipeline
-from chizma_api.generation.providers import ModelReply, SketchInput, Usage
+from chizma_api.generation.providers import ModelReply, RefineInput, SketchInput, Usage
 from chizma_api.generation.schemas import SceneGraph
 from tests.sketches import house_and_sun
 
@@ -40,6 +40,10 @@ class ScriptedProvider:
     async def generate_blocks(
         self, sketch: SketchInput, scene: SceneGraph, feedback: str | None
     ) -> ModelReply:
+        self.feedback.append(feedback)
+        return ModelReply(self.blocks.pop(0), Usage(20, 50, 0.002, 1))
+
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
         self.feedback.append(feedback)
         return ModelReply(self.blocks.pop(0), Usage(20, 50, 0.002, 1))
 
@@ -117,3 +121,25 @@ async def test_positions_come_from_the_drawn_shapes_not_the_model() -> None:
     assert bbox.y == pytest.approx(40 / 220)
     assert bbox.w == pytest.approx(160 / 380)
     assert bbox.h == pytest.approx(180 / 220)
+
+
+async def test_refine_retries_when_the_block_id_is_wrong() -> None:
+    from chizma_api.generation.pipeline import run_refine
+    from chizma_api.generation.schemas import Block, SceneGraph
+
+    scene = SceneGraph.model_validate_json(await _valid_scene())
+    element = scene.elements[0]
+    wrong = json.dumps({"blocks": [{"element_id": "other", "html": "<p>x</p>", "css": ""}]})
+    right = json.dumps(
+        {"blocks": [{"element_id": element.id, "html": "<p onclick='x'>ok</p>", "css": ""}]}
+    )
+    provider = ScriptedProvider([], [wrong, right])
+    request = RefineInput(
+        element, Block(element_id=element.id, html="", css=""), "make it bold", 100, 100, "ru"
+    )
+
+    result = await run_refine(provider, request)
+
+    assert provider.feedback[1] is not None and element.id in provider.feedback[1]
+    assert result.block.html == "<p>ok</p>"
+    assert result.usage.calls == 2

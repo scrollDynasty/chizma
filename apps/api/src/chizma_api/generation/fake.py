@@ -5,10 +5,11 @@ shape in its drawn colours. It is not smart, but it exercises the whole pipeline
 """
 
 import json
+import re
 from html import escape
 from typing import Any
 
-from chizma_api.generation.providers import ModelReply, SketchInput, Usage
+from chizma_api.generation.providers import ModelReply, RefineInput, SketchInput, Usage
 from chizma_api.generation.schemas import SceneGraph
 
 _KIND = {
@@ -27,6 +28,14 @@ _QUESTION = {
     "uz-Latn": ("Bu qanday chizma?", ["rasm", "logotip", "bezak"]),
     "uz-Cyrl": ("Бу қандай чизма?", ["расм", "логотип", "безак"]),
 }
+
+# Colour words the fake understands in edit requests (en, ru, uz).
+_COLOURS = {
+    "red": "#e03131", "красн": "#e03131", "qizil": "#e03131",
+    "blue": "#1971c2", "син": "#1971c2", "ko'k": "#1971c2", "kok": "#1971c2",
+    "green": "#2f9e44", "зел": "#2f9e44", "yashil": "#2f9e44",
+    "yellow": "#f08c00", "жёлт": "#f08c00", "желт": "#f08c00", "sariq": "#f08c00",
+}  # fmt: skip
 
 _TITLE = {"en": "My site", "ru": "Мой сайт", "uz-Latn": "Mening saytim", "uz-Cyrl": "Менинг сайтим"}
 
@@ -104,6 +113,10 @@ class FakeProvider:
         ]
         return ModelReply(text=json.dumps({"blocks": blocks}), usage=Usage(calls=1))
 
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
+        block = {"element_id": refine.element.id, **_refine(refine)}
+        return ModelReply(text=json.dumps({"blocks": [block]}), usage=Usage(calls=1))
+
 
 def _render(shape: str, text: str | None, colors: list[str]) -> dict[str, str]:
     stroke = colors[0] if colors else "#1e1e1e"
@@ -139,3 +152,39 @@ def _render(shape: str, text: str | None, colors: list[str]) -> dict[str, str]:
             f'stroke="{stroke}" stroke-width="3" stroke-dasharray="6 6"/>'
         )
     return {"html": svg.format(body), "css": "svg{display:block;}"}
+
+
+def _colour_in(text: str) -> str | None:
+    lowered = text.lower()
+    for word, colour in _COLOURS.items():
+        if word in lowered:
+            return colour
+    return None
+
+
+def _refine(refine: RefineInput) -> dict[str, str]:
+    """Recolour on colour words, add the request as a caption otherwise, outline drawn strokes."""
+    html, css = refine.block.html, refine.block.css
+    colour = _colour_in(refine.instruction)
+    if colour:
+        html = re.sub(r'fill="(?!none)[^"]*"', f'fill="{colour}"', html, count=1)
+        css = re.sub(r"background:[^;}]*", f"background:{colour}", css, count=1)
+    elif refine.instruction.strip():
+        html += f'<p class="note">{escape(refine.instruction.strip())}</p>'
+        css += ".note{position:absolute;left:0;right:0;bottom:4px;margin:0;text-align:center;"
+        css += "font:600 14cqh/1 system-ui,sans-serif;}"
+    if refine.shapes:
+        width, height = max(refine.width, 1.0), max(refine.height, 1.0)
+        rects = "".join(
+            f'<rect x="{float(s.get("x", 0))}" y="{float(s.get("y", 0))}" '
+            f'width="{float(s.get("width", 0))}" height="{float(s.get("height", 0))}" '
+            f'fill="none" stroke="{_colour(s.get("stroke"), "#1e1e1e")}" stroke-width="2"/>'
+            for s in refine.shapes[:50]
+        )
+        html += (
+            f'<svg class="drawn" viewBox="0 0 {width} {height}" preserveAspectRatio="none">'
+            f"{rects}</svg>"
+        )
+        css += ".drawn{position:absolute;inset:0;width:100%;height:100%;}"
+    css += ".refined{position:relative;width:100%;height:100%;}"
+    return {"html": f'<div class="refined">{html}</div>', "css": css}

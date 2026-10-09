@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, fetchGeneration, type GenerationRequest, startGeneration } from "@/lib/api";
+import {
+  ApiError,
+  fetchGeneration,
+  type GenerationRequest,
+  type RefineRequest,
+  startGeneration,
+  startRefine,
+} from "@/lib/api";
 import type { GenerationJob } from "@/lib/scene";
 
 export type GenerationState =
@@ -13,7 +20,7 @@ const TIMEOUT_MS = 3 * 60_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Starts a generation job and polls it until it finishes. */
+/** Starts a generation or block refinement job and polls it until it finishes. */
 export function useGeneration() {
   const [state, setState] = useState<GenerationState>({ phase: "idle" });
   const run = useRef(0);
@@ -24,12 +31,12 @@ export function useGeneration() {
     };
   }, []);
 
-  const generate = useCallback(async (request: GenerationRequest) => {
+  const track = useCallback(async (start: () => Promise<{ id: string }>) => {
     const current = ++run.current;
     const alive = () => run.current === current;
     setState({ phase: "working", stage: "uploading" });
     try {
-      const { id } = await startGeneration(request);
+      const { id } = await start();
       const deadline = Date.now() + TIMEOUT_MS;
       while (alive()) {
         const job = await fetchGeneration(id);
@@ -49,5 +56,14 @@ export function useGeneration() {
     }
   }, []);
 
-  return { state, generate };
+  const generate = useCallback(
+    (request: GenerationRequest) => track(() => startGeneration(request)),
+    [track],
+  );
+  const refine = useCallback(
+    (request: RefineRequest) => track(() => startRefine(request)),
+    [track],
+  );
+
+  return { state, generate, refine };
 }

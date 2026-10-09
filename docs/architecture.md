@@ -63,3 +63,14 @@ All model calls go through one `AIProvider` interface. Implementations: `FakePro
 - `GET /v1/generations/quota` returns today's usage for the user.
 
 Switch the model with `CHIZMA_AI_PROVIDER=openai`, `OPENAI_API_KEY`, `CHIZMA_AI_MODEL` and the matching `CHIZMA_AI_*_USD_PER_MTOK` prices (used for the daily budget).
+
+## Editing blocks (M2)
+
+Select one generated block to get its panel:
+
+- **Change in words**: `POST /v1/generations/refine` with the element, its current html/css and the instruction. Only that block is regenerated.
+- **Draw over**: strokes drawn over the block after pressing *Draw over* are sent as a PNG plus shapes relative to the block; after *Apply* they are removed and the block is rebuilt with them.
+- **Versions**: every edit adds a version (kept in the block's canvas data); step back and forth with ‹ ›. Editing an older version drops the later ones.
+- **Clarifying questions**: when the model is unsure it asks one question with options; the answer is sent as a refinement and the question disappears.
+
+Refinements count towards the same daily quota and budget as full generations.

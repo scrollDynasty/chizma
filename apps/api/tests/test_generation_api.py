@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from chizma_api.generation.providers import AIProviderError, ModelReply, SketchInput
+from chizma_api.generation.providers import AIProviderError, ModelReply, RefineInput, SketchInput
 from chizma_api.generation.schemas import SceneGraph
 from tests.sketches import HOUSE_AND_SUN, PNG
 
@@ -110,6 +110,9 @@ class BrokenProvider:
     ) -> ModelReply:
         raise AIProviderError("RateLimitError")
 
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
+        raise AIProviderError("RateLimitError")
+
 
 def test_provider_failure_is_reported_on_the_job(client_factory: ClientFactory) -> None:
     client = signed_in(client_factory)
@@ -127,3 +130,93 @@ def test_openai_without_key_keeps_the_api_up(client_factory: ClientFactory) -> N
     assert client.get("/health").status_code == 200
     job = client.get(f"/v1/generations/{start(client).json()['id']}").json()
     assert job["error"] == "ai_unavailable"
+
+
+SUN_ELEMENT = {
+    "id": "el_1",
+    "kind": "illustration",
+    "label": "sun",
+    "intent": "illustration of a sun",
+    "bbox": {"x": 0.7, "y": 0.0, "w": 0.2, "h": 0.3},
+    "confidence": 0.9,
+    "parent_id": None,
+    "source_shape_ids": ["sun"],
+    "text": None,
+    "style_hints": {"colors": ["#f08c00"], "shape": "circle", "notes": ""},
+    "alternatives": [],
+}
+SUN_HTML = (
+    '<svg viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="47" ry="47" fill="#ffec99"/></svg>'
+)
+
+
+def refine(client: TestClient, png: bytes | None = None, **fields: Any) -> Any:
+    data = {
+        "element": json.dumps(SUN_ELEMENT),
+        "html": SUN_HTML,
+        "css": "",
+        "width": "100",
+        "height": "100",
+        "locale": "ru",
+    }
+    data.update(fields)
+    files = {"image": ("drawn.png", png, "image/png")} if png is not None else None
+    return client.post("/v1/generations/refine", data=data, files=files)
+
+
+def test_refine_changes_one_block_by_words(client_factory: ClientFactory) -> None:
+    client = signed_in(client_factory)
+
+    started = refine(client, instruction="сделай синим")
+    assert started.status_code == 202
+    job = client.get(f"/v1/generations/{started.json()['id']}").json()
+
+    assert job["status"] == "done"
+    assert job["scene"] is None
+    assert [b["element_id"] for b in job["blocks"]] == ["el_1"]
+    assert 'fill="#1971c2"' in job["blocks"][0]["html"]
+
+
+def test_refine_uses_strokes_drawn_over_the_block(client_factory: ClientFactory) -> None:
+    client = signed_in(client_factory)
+    door = [
+        {
+            "id": "d",
+            "type": "rectangle",
+            "x": 40,
+            "y": 60,
+            "width": 20,
+            "height": 40,
+            "stroke": "#000000",
+        }
+    ]
+
+    started = refine(client, png=PNG, shapes=json.dumps(door))
+    job = client.get(f"/v1/generations/{started.json()['id']}").json()
+
+    assert job["status"] == "done"
+    assert '<rect x="40.0" y="60.0" width="20.0" height="40.0"' in job["blocks"][0]["html"]
+
+
+def test_refine_needs_words_or_strokes(client_factory: ClientFactory) -> None:
+    client = signed_in(client_factory)
+
+    assert refine(client, instruction="   ").json()["detail"] == "nothing_to_change"
+    assert refine(client, element="{}", instruction="x").json()["detail"] == "invalid_element"
+
+
+def test_refine_counts_towards_the_daily_quota(client_factory: ClientFactory) -> None:
+    client = signed_in(client_factory, daily_user_limit=1)
+
+    assert refine(client, instruction="красным").status_code == 202
+    assert refine(client, instruction="зелёным").json()["detail"] == "daily_limit"
+
+
+def test_refine_output_is_sanitised(client_factory: ClientFactory) -> None:
+    client = signed_in(client_factory)
+
+    started = refine(client, instruction="<script>alert(1)</script> подпись")
+    html = client.get(f"/v1/generations/{started.json()['id']}").json()["blocks"][0]["html"]
+
+    assert "<script" not in html
+    assert "&lt;script&gt;" in html

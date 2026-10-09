@@ -71,7 +71,8 @@ export function insertResult<T extends SceneItem>(
   for (const element of scene.elements) {
     const block = blocks.get(element.id);
     if (!block) continue;
-    const data = blockData(element, block, locale);
+    const question = scene.questions.find((q) => q.element_id === element.id) ?? null;
+    const data = blockData(element, block, locale, question);
     const created: NewBlock = {
       id: `chz-${crypto.randomUUID()}`,
       type: "iframe",

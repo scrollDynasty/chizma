@@ -1,12 +1,19 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["uploading", "recognizing", "building"] as const;
+export const GENERATION_STEPS = ["uploading", "recognizing", "building"];
+export const REFINE_STEPS = ["uploading", "refining"];
 
 /** Covers the canvas while a generation runs: the drawing is frozen and the steps are shown. */
-export function GenerationLoader({ stage }: { stage: string }) {
+export function GenerationLoader({
+  stage,
+  steps = GENERATION_STEPS,
+}: {
+  stage: string;
+  steps?: readonly string[];
+}) {
   const { t } = useTranslation();
-  const current = Math.max(0, STEPS.indexOf(stage as (typeof STEPS)[number]));
+  const current = Math.max(0, steps.indexOf(stage));
 
   return (
     <div className="chz-loader absolute inset-0 z-50 grid place-items-center bg-background/55 backdrop-blur-[3px]">
@@ -17,7 +24,7 @@ export function GenerationLoader({ stage }: { stage: string }) {
       >
         <div className="chz-orb mx-auto" aria-hidden="true" />
         <ol className="flex flex-col gap-2.5">
-          {STEPS.map((step, index) => (
+          {steps.map((step, index) => (
             <li
               key={step}
               className={cn(
