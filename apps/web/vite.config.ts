@@ -7,6 +7,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? "/chizma/",
   plugins: [react(), tailwindcss()],
+  // Excalidraw (~1 MB) is a lazily loaded chunk used only on the editor page.
+  build: { chunkSizeWarningLimit: 1200 },
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },

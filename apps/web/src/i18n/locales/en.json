@@ -31,5 +31,14 @@
   },
   "newSite": {
     "title": "New site"
+  },
+  "canvas": {
+    "generate": "Generate",
+    "home": "Home",
+    "loading": "Loading the canvas…",
+    "previewTitle": "Preview",
+    "previewEmpty": "Draw anything (a house, a sun, a few boxes) and press “Generate”.",
+    "snapshotNote": "This is what the server will see. Generation arrives in the next step.",
+    "savedLocally": "Your drawing is saved in this browser."
   }
 }

@@ -13,16 +13,17 @@ export function App() {
         <Route index element={<Home />} />
         <Route path="login" element={<Login />} />
         <Route path="auth/callback" element={<AuthCallback />} />
-        <Route
-          path="new"
-          element={
-            <RequireAuth>
-              <NewSite />
-            </RequireAuth>
-          }
-        />
         <Route path="*" element={<Home />} />
       </Route>
+      {/* The editor is full-screen, outside the page layout. */}
+      <Route
+        path="new"
+        element={
+          <RequireAuth>
+            <NewSite />
+          </RequireAuth>
+        }
+      />
     </Routes>
   );
 }
