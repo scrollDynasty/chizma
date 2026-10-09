@@ -10,6 +10,8 @@ export interface Snapshot {
   png: Blob;
   shapes: SketchShape[];
   bounds: SketchBounds;
+  /** Size of the visible canvas in CSS pixels; the result is drawn at exactly this size. */
+  viewport: { width: number; height: number };
 }
 
 export interface CanvasHandle {
@@ -41,7 +43,15 @@ export default function SketchCanvas({ langCode, onReady, onElementCountChange }
     onReady({
       snapshot: async () => {
         const elements = api.getSceneElements();
-        const { bounds, shapes } = simplifyShapes(elements);
+        // The visible canvas is the page frame: the result is laid exactly over what you see.
+        const view = api.getAppState();
+        const frame = {
+          x: -view.scrollX,
+          y: -view.scrollY,
+          width: view.width / view.zoom.value,
+          height: view.height / view.zoom.value,
+        };
+        const { bounds, shapes } = simplifyShapes(elements, frame);
         if (!bounds) return null;
         const png = await exportToBlob({
           elements,
@@ -51,7 +61,7 @@ export default function SketchCanvas({ langCode, onReady, onElementCountChange }
           maxWidthOrHeight: MAX_IMAGE_SIDE,
           exportPadding: 16,
         });
-        return { png, shapes, bounds };
+        return { png, shapes, bounds, viewport: { width: view.width, height: view.height } };
       },
     });
   };

@@ -20,7 +20,7 @@ async def test_fake_provider_turns_each_shape_into_a_block() -> None:
     assert [b.element_id for b in result.blocks] == ["el_1", "el_2", "el_3"]
     sun = result.scene.elements[0]
     assert sun.bbox.x == pytest.approx(300 / 380)
-    assert "<circle" in result.blocks[0].html
+    assert "<ellipse" in result.blocks[0].html
 
 
 class ScriptedProvider:
@@ -113,5 +113,7 @@ async def test_positions_come_from_the_drawn_shapes_not_the_model() -> None:
     result = await run_pipeline(provider, house_and_sun())
 
     bbox = result.scene.elements[0].bbox
-    assert (bbox.x, bbox.y) == (0.0, pytest.approx(40 / 220))
-    assert (bbox.w, bbox.h) == (pytest.approx(160 / 380), pytest.approx(180 / 220))
+    assert bbox.x == 0.0
+    assert bbox.y == pytest.approx(40 / 220)
+    assert bbox.w == pytest.approx(160 / 380)
+    assert bbox.h == pytest.approx(180 / 220)

@@ -61,13 +61,22 @@ export function boundsOf(elements: readonly DrawnElement[]): SketchBounds | null
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-export function simplifyShapes(elements: readonly DrawnElement[]): {
+/**
+ * @param frame Reference rectangle in scene coordinates (the visible canvas). Shapes are made
+ *   relative to it so the generated page can be laid exactly over the drawing. Defaults to the
+ *   drawing's own bounds.
+ */
+export function simplifyShapes(
+  elements: readonly DrawnElement[],
+  frame?: SketchBounds,
+): {
   bounds: SketchBounds | null;
   shapes: SketchShape[];
 } {
   const visible = visibleElements(elements);
-  const bounds = boundsOf(visible);
-  if (!bounds) return { bounds: null, shapes: [] };
+  const drawn = boundsOf(visible);
+  if (!drawn) return { bounds: null, shapes: [] };
+  const bounds = frame ?? drawn;
   const shapes = visible.map((element) => {
     const x = Math.min(element.x, element.x + element.width);
     const y = Math.min(element.y, element.y + element.height);
