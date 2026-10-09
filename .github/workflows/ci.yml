@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets the release workflow run CI on release-please PRs, which GITHUB_TOKEN
+  # pushes cannot trigger directly.
+  workflow_dispatch:
 
 permissions:
   contents: read
