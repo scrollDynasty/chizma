@@ -7,7 +7,13 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ValidationError
 
-from chizma_api.generation.providers import AIProvider, ModelReply, SketchInput, Usage
+from chizma_api.generation.providers import (
+    AIProvider,
+    ModelReply,
+    RefineInput,
+    SketchInput,
+    Usage,
+)
 from chizma_api.generation.sanitize import clean_css, sanitize_fragment
 from chizma_api.generation.schemas import BBox, Block, BlockSet, SceneGraph
 
@@ -112,3 +118,41 @@ async def run_pipeline(
                 )
             )
     return PipelineResult(scene=scene, blocks=blocks, usage=usage)
+
+
+@dataclass
+class RefineResult:
+    block: Block
+    usage: Usage = field(default_factory=Usage)
+
+
+async def run_refine(
+    provider: AIProvider,
+    refine: RefineInput,
+    on_stage: Callable[[str], None] = lambda _: None,
+) -> RefineResult:
+    """Regenerate one block from words and/or strokes drawn over it."""
+    usage = Usage()
+    on_stage("refining")
+    feedback: str | None = None
+    for _attempt in range(2):
+        reply = await provider.refine_block(refine, feedback)
+        usage.add(reply.usage)
+        try:
+            block_set = _parse(BlockSet, reply)
+            block = next(b for b in block_set.blocks if b.element_id == refine.element.id)
+        except (ValidationError, ValueError) as exc:
+            feedback = _short_error(exc)
+        except StopIteration:
+            feedback = f"return exactly one block with element_id {refine.element.id!r}"
+        else:
+            return RefineResult(
+                block=Block(
+                    element_id=block.element_id,
+                    html=sanitize_fragment(block.html),
+                    css=clean_css(block.css),
+                ),
+                usage=usage,
+            )
+        log.warning("invalid refined block from %s: %s", provider.name, feedback)
+    raise InvalidModelOutputError("refined block")

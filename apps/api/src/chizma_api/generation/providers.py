@@ -8,7 +8,13 @@ from typing import Any, Protocol
 
 from chizma_api.config import Settings
 from chizma_api.generation import prompts
-from chizma_api.generation.schemas import BLOCKS_JSON_SCHEMA, SCENE_JSON_SCHEMA, SceneGraph
+from chizma_api.generation.schemas import (
+    BLOCKS_JSON_SCHEMA,
+    SCENE_JSON_SCHEMA,
+    Block,
+    Element,
+    SceneGraph,
+)
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +26,20 @@ class SketchInput:
     width: float
     height: float
     locale: str
+
+
+@dataclass(frozen=True)
+class RefineInput:
+    """One existing block to change, by words and/or by strokes drawn over it."""
+
+    element: Element
+    block: Block
+    instruction: str
+    width: float  # box size in canvas units; drawn strokes are positioned inside it
+    height: float
+    locale: str
+    png: bytes | None = None
+    shapes: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -54,6 +74,20 @@ class AIProvider(Protocol):
     async def generate_blocks(
         self, sketch: SketchInput, scene: SceneGraph, feedback: str | None
     ) -> ModelReply: ...
+
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply: ...
+
+
+def refine_context(refine: RefineInput, feedback: str | None) -> str:
+    context = {
+        "locale": refine.locale,
+        "element": refine.element.model_dump(),
+        "current": {"html": refine.block.html, "css": refine.block.css},
+        "box_size": {"width": refine.width, "height": refine.height},
+        "requested_change": refine.instruction,
+        "drawn_over_shapes": refine.shapes,
+    }
+    return _with_feedback(json.dumps(context, ensure_ascii=False), feedback)
 
 
 def _with_feedback(text: str, feedback: str | None) -> str:
@@ -155,6 +189,21 @@ class OpenAIProvider:
             prompts.GENERATE_BLOCKS, content, "blocks", BLOCKS_JSON_SCHEMA, 16_000
         )
 
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
+        content: list[dict[str, Any]] = [
+            {"type": "input_text", "text": refine_context(refine, feedback)}
+        ]
+        if refine.png:
+            data = base64.b64encode(refine.png).decode()
+            content.append(
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{data}",
+                    "detail": "auto",
+                }
+            )
+        return await self._call(prompts.REFINE_BLOCK, content, "blocks", BLOCKS_JSON_SCHEMA, 8_000)
+
 
 class UnavailableProvider:
     """Used when the configured provider cannot start (e.g. missing key): the API stays up
@@ -170,6 +219,9 @@ class UnavailableProvider:
     async def generate_blocks(
         self, sketch: SketchInput, scene: SceneGraph, feedback: str | None
     ) -> ModelReply:
+        raise AIProviderError(self._reason)
+
+    async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
         raise AIProviderError(self._reason)
 
 
