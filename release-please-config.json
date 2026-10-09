@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "chizma",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": false,
+      "extra-files": [
+        { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" },
+        { "type": "toml", "path": "apps/api/pyproject.toml", "jsonpath": "$.project.version" }
+      ]
+    }
+  }
+}
