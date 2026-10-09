@@ -2,7 +2,7 @@
 # Create or update GitHub labels from .github/labels.yml (requires gh and python3).
 set -euo pipefail
 repo="${1:-scrollDynasty/chizma}"
-python3 - "$repo" <<'PY'
+"${PYTHON:-python3}" - "$repo" <<'PY'
 import re, subprocess, sys
 repo = sys.argv[1]
 for line in open(".github/labels.yml", encoding="utf-8"):
