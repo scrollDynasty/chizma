@@ -28,5 +28,12 @@ updates:
     directories: ["/apps/api", "/apps/web"]
     schedule:
       interval: weekly
+    ignore:
+      # Stay on Node LTS and the Python version used by Azure App Service;
+      # bump these deliberately, not via Dependabot.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: "chore(docker)"
