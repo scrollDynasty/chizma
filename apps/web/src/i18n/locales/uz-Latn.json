@@ -10,5 +10,26 @@
     "ok": "Server: ishlayapti",
     "down": "Server mavjud emas"
   },
-  "language": "Til"
+  "language": "Til",
+  "nav": {
+    "signIn": "Kirish",
+    "signOut": "Chiqish"
+  },
+  "login": {
+    "title": "Chizma’ga kirish",
+    "subtitle": "Parolsiz: GitHub yoki Google hisobingiz orqali kiring.",
+    "github": "GitHub orqali kirish",
+    "google": "Google orqali kirish",
+    "unavailable": "Serverda kirish hali sozlanmagan.",
+    "signingIn": "Kirilmoqda…",
+    "back": "Kirishga qaytish",
+    "errors": {
+      "not_allowed": "Bu hisob hali sinovchilar ro‘yxatida yo‘q.",
+      "oauth_failed": "Kirish bekor qilindi yoki amalga oshmadi. Qayta urinib ko‘ring.",
+      "generic": "Nimadir xato ketdi. Qayta urinib ko‘ring."
+    }
+  },
+  "newSite": {
+    "title": "Yangi sayt"
+  }
 }
