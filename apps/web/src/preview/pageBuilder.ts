@@ -15,20 +15,17 @@ export interface BuildOptions {
   sanitizeHtml: (html: string) => string;
 }
 
-/** Kinds that flow with their text instead of keeping the drawn proportions. */
-const FLOWING_KINDS = new Set([
-  "heading",
-  "text",
-  "button",
-  "nav",
-  "header",
-  "footer",
-  "list",
-  "form",
-  "input",
-  "menu",
-  "link",
-]); // prettier-ignore
+/** Pictures keep the drawn proportions; everything else grows with its content. */
+const PICTURE_KINDS = new Set([
+  "illustration",
+  "image",
+  "icon",
+  "picture",
+  "photo",
+  "logo",
+  "map",
+  "drawing",
+]);
 
 const MIN_GAP = 0.03;
 
@@ -101,7 +98,7 @@ export function buildPage(
       if (column.startsWith("spacer:")) return '<div class="chz-spacer" aria-hidden="true"></div>';
       const element = items[itemIndex++] as SceneElement;
       const block = byId.get(element.id) as Block;
-      const flowing = FLOWING_KINDS.has(element.kind.toLowerCase());
+      const flowing = !PICTURE_KINDS.has(element.kind.toLowerCase());
       const ratio = (element.bbox.w * options.aspect) / Math.max(element.bbox.h, 0.01);
       const style = flowing ? "" : ` style="aspect-ratio:${ratio.toFixed(3)}"`;
       return `<div class="chz-cell${flowing ? " chz-flow" : ""}" data-el="${escapeText(element.id)}"${style}>${options.sanitizeHtml(block.html)}</div>`;

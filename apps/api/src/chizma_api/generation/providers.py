@@ -114,6 +114,9 @@ class OpenAIProvider:
                 store=False,
             )
         except openai.OpenAIError as exc:
+            # Server log only: status and provider message help diagnose model/parameter issues.
+            status = getattr(exc, "status_code", None)
+            log.warning("OpenAI %s (status %s): %s", type(exc).__name__, status, str(exc)[:500])
             raise AIProviderError(type(exc).__name__) from exc
 
         usage = Usage(calls=1)
