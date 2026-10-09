@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from chizma_api.db import Base
@@ -32,3 +32,25 @@ class LoginCode(Base):
     code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     expires_at: Mapped[int] = mapped_column(Integer)  # unix seconds
+
+
+class GenerationUsage(Base):
+    """How many generations a user started on a given UTC day."""
+
+    __tablename__ = "generation_usage"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)  # YYYY-MM-DD (UTC)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class DailySpend(Base):
+    """Project-wide AI spend per UTC day, used for the daily budget cap."""
+
+    __tablename__ = "daily_spend"
+
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    usd: Mapped[float] = mapped_column(Float, default=0.0)
+    generations: Mapped[int] = mapped_column(Integer, default=0)

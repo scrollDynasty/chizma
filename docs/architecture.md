@@ -22,9 +22,8 @@ Every model response is validated against the JSON schema. On failure the reques
 |---|---|---|
 | Editor and landing page | `apps/web` | GitHub Pages (static) |
 | API | `apps/api` | Azure App Service F1 (Linux, free) |
-| Scene schema | `packages/scene-schema` | shared |
-| Page builder | `packages/page-builder` | shared (preview now, export in M4) |
-| Sandbox | `packages/sandbox` | editor |
+| Scene schema and pipeline | `apps/api/src/chizma_api/generation` | API |
+| Page builder and sandbox | `apps/web/src/preview` | editor (moves to a shared package for export in M4) |
 
 GitHub Pages can only serve static files, so everything that needs a secret (AI keys, OAuth secrets) or state (database) lives in the API.
 
@@ -44,3 +43,11 @@ All model calls go through one `AIProvider` interface. Implementations: `FakePro
 
 - Test phase: SQLite on the App Service persistent disk (`/home/data`) for users, quotas and spend; drawings stay in the browser (IndexedDB).
 - From M2/M3: PostgreSQL, drawings and versions server-side, images in Blob storage.
+
+## Generation API
+
+- `POST /v1/generations` (signed in, multipart: `image` PNG, `shapes` JSON, `width`, `height`, `locale`) returns `202 {id}`.
+- `GET /v1/generations/{id}` returns `status` (`queued`, `running`, `done`, `failed`), `stage`, `scene`, `blocks`, `error`.
+- `GET /v1/generations/quota` returns today's usage for the user.
+
+Switch the model with `CHIZMA_AI_PROVIDER=openai`, `OPENAI_API_KEY`, `CHIZMA_AI_MODEL` and the matching `CHIZMA_AI_*_USD_PER_MTOK` prices (used for the daily budget).

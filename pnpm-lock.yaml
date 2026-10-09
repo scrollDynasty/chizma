@@ -34,6 +34,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dompurify:
+        specifier: 3.4.16
+        version: 3.4.16
       i18next:
         specifier: 26.4.2
         version: 26.4.2(typescript@7.0.2)

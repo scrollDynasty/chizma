@@ -1,3 +1,5 @@
+import type { GenerationJob } from "./scene";
+
 export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 const TOKEN_KEY = "chizma.token";
@@ -32,7 +34,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   const token = readToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (typeof init.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(`${API_URL}${path}`, { ...init, headers });
   if (!response.ok) {
@@ -83,3 +87,36 @@ export const exchangeCode = (code: string) =>
   });
 
 export const loginUrl = (provider: Provider) => `${API_URL}/v1/auth/${provider}/login`;
+
+export interface Quota {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface GenerationRequest {
+  png: Blob;
+  shapes: unknown[];
+  width: number;
+  height: number;
+  locale: string;
+}
+
+export function startGeneration(request: GenerationRequest) {
+  const form = new FormData();
+  form.append("image", request.png, "sketch.png");
+  form.append("shapes", JSON.stringify(request.shapes));
+  form.append("width", String(Math.max(1, Math.round(request.width))));
+  form.append("height", String(Math.max(1, Math.round(request.height))));
+  form.append("locale", request.locale);
+  return apiFetch<{ id: string; status: string }>("/v1/generations", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export const fetchGeneration = (id: string, signal?: AbortSignal) =>
+  apiFetch<GenerationJob>(`/v1/generations/${encodeURIComponent(id)}`, { signal });
+
+export const fetchQuota = (signal?: AbortSignal) =>
+  apiFetch<Quota>("/v1/generations/quota", { signal });

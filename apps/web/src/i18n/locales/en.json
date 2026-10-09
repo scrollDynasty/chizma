@@ -38,7 +38,29 @@
     "loading": "Loading the canvas…",
     "previewTitle": "Preview",
     "previewEmpty": "Draw anything (a house, a sun, a few boxes) and press “Generate”.",
-    "snapshotNote": "This is what the server will see. Generation arrives in the next step.",
     "savedLocally": "Your drawing is saved in this browser."
+  },
+  "gen": {
+    "stage": {
+      "uploading": "Sending your drawing…",
+      "queued": "Waiting in line…",
+      "recognizing": "Recognising the drawing…",
+      "building": "Building the page…"
+    },
+    "empty": "Nothing to build yet: no elements were recognised.",
+    "unsure": "Not sure about these, check them:",
+    "quota": "Generations left today: {{remaining}} of {{limit}}",
+    "preview": "Generated site preview",
+    "errors": {
+      "daily_limit": "You have used all generations for today. Come back tomorrow.",
+      "budget_exhausted": "Today's generation budget is used up. Try again tomorrow.",
+      "too_fast": "Wait a few seconds before generating again.",
+      "generation_disabled": "Generation is paused right now.",
+      "ai_unavailable": "The AI service is unavailable. Try again later.",
+      "ai_invalid_output": "The AI answered with something we could not use. Try again.",
+      "image_too_large": "The drawing is too large. Try making it smaller.",
+      "timeout": "Generation took too long. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
   }
 }

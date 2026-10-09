@@ -38,7 +38,29 @@
     "loading": "Chizish maydoni yuklanmoqda…",
     "previewTitle": "Ko‘rinish",
     "previewEmpty": "Istalgan narsani chizing (uy, quyosh, bir nechta to‘rtburchak) va «Yaratish»ni bosing.",
-    "snapshotNote": "Server chizmangizni shunday ko‘radi. Yaratish keyingi bosqichda paydo bo‘ladi.",
     "savedLocally": "Chizma shu brauzerda saqlanadi."
+  },
+  "gen": {
+    "stage": {
+      "uploading": "Chizma yuborilmoqda…",
+      "queued": "Navbatda…",
+      "recognizing": "Chizma tanib olinmoqda…",
+      "building": "Sahifa yig‘ilmoqda…"
+    },
+    "empty": "Hozircha yig‘adigan narsa yo‘q: elementlar tanib olinmadi.",
+    "unsure": "Bu elementlarga ishonchim komil emas, tekshiring:",
+    "quota": "Bugun qolgan yaratishlar: {{remaining}} / {{limit}}",
+    "preview": "Yaratilgan sayt ko‘rinishi",
+    "errors": {
+      "daily_limit": "Bugungi yaratishlar tugadi. Ertaga qaytib keling.",
+      "budget_exhausted": "Bugungi yaratish byudjeti tugadi. Ertaga urinib ko‘ring.",
+      "too_fast": "Keyingi yaratishdan oldin bir necha soniya kuting.",
+      "generation_disabled": "Yaratish hozir to‘xtatilgan.",
+      "ai_unavailable": "SI xizmati mavjud emas. Keyinroq urinib ko‘ring.",
+      "ai_invalid_output": "SI javobidan foydalanib bo‘lmadi. Qayta urinib ko‘ring.",
+      "image_too_large": "Chizma juda katta. Kichikroq qilib ko‘ring.",
+      "timeout": "Yaratish juda uzoq davom etdi. Qayta urinib ko‘ring.",
+      "generic": "Nimadir xato ketdi. Qayta urinib ko‘ring."
+    }
   }
 }

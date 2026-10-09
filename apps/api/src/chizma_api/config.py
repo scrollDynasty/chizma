@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEV_JWT_SECRET = "dev-insecure-secret-change-me"  # noqa: S105 - placeholder, rejected in production
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         env_prefix="CHIZMA_",
         env_file=(".env", "../../.env"),
         extra="ignore",
+        populate_by_name=True,
     )
 
     env: Literal["development", "test", "production"] = "development"
@@ -33,6 +34,22 @@ class Settings(BaseSettings):
     google_client_secret: SecretStr = SecretStr("")
     # Closed-test allow-list, e.g. "github:octocat,google:1234567890". Empty means open.
     allowed_users: Annotated[list[str], NoDecode] = []
+
+    # AI generation
+    ai_provider: Literal["fake", "openai"] = "fake"
+    ai_model: str = "gpt-6-luna"
+    # USD per million tokens for the chosen model; used for the daily budget.
+    ai_input_usd_per_mtok: float = 0.10
+    ai_output_usd_per_mtok: float = 0.50
+    openai_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("OPENAI_API_KEY", "CHIZMA_OPENAI_API_KEY"),
+    )
+    generation_enabled: bool = True
+    daily_user_limit: int = 30
+    daily_budget_usd: float = 2.0
+    min_seconds_between_generations: float = 10.0
+    max_image_bytes: int = 2 * 1024 * 1024
 
     @field_validator("cors_origins", mode="before")
     @classmethod
