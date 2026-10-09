@@ -31,5 +31,14 @@
   },
   "newSite": {
     "title": "Yangi sayt"
+  },
+  "canvas": {
+    "generate": "Yaratish",
+    "home": "Bosh sahifa",
+    "loading": "Chizish maydoni yuklanmoqda…",
+    "previewTitle": "Ko‘rinish",
+    "previewEmpty": "Istalgan narsani chizing (uy, quyosh, bir nechta to‘rtburchak) va «Yaratish»ni bosing.",
+    "snapshotNote": "Server chizmangizni shunday ko‘radi. Yaratish keyingi bosqichda paydo bo‘ladi.",
+    "savedLocally": "Chizma shu brauzerda saqlanadi."
   }
 }

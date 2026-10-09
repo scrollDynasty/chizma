@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "./i18n";
 import { json, mockApi, renderAt } from "./test/render";
 
+// Excalidraw needs a real <canvas>; the editor shell is what these tests cover.
+vi.mock("@/canvas/SketchCanvas", () => ({ default: () => null }));
+
 const USER = { id: 1, provider: "github", login: "octocat", name: "The Octocat", avatar_url: null };
 
 describe("App", () => {
