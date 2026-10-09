@@ -4,6 +4,7 @@ import {
   exportToBlob,
   newElementWith,
   restoreElements,
+  viewportCoordsToSceneCoords,
 } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
@@ -76,6 +77,14 @@ export interface CanvasHandle {
   removeElements: (ids: readonly string[]) => void;
   /** Select one element (view mode clears the selection while a request runs). */
   select: (id: string) => void;
+  /** Every generated block on the canvas, in drawing order. */
+  allBlocks: () => SelectedBlock[];
+  /** The topmost block under a point on the screen (client coordinates). */
+  blockAt: (clientX: number, clientY: number) => SelectedBlock | null;
+  /** Show or hide a block for "Try" mode only: not saved in history. */
+  setVisible: (id: string, visible: boolean) => void;
+  /** Bring a block into view (scroll action). */
+  scrollTo: (id: string) => void;
 }
 
 interface Props {
@@ -224,6 +233,37 @@ export default function SketchCanvas({
         });
         const { shapes } = simplifyShapes(strokes, box);
         return { png, shapes, ids: strokes.map((s) => s.id) };
+      },
+      allBlocks: () =>
+        api.getSceneElements().flatMap((element) => {
+          const data = blockDataOf(element);
+          return data
+            ? [{ id: element.id, data, width: element.width, height: element.height }]
+            : [];
+        }),
+      blockAt: (clientX, clientY) => {
+        const point = viewportCoordsToSceneCoords({ clientX, clientY }, api.getAppState());
+        const hit = [...api.getSceneElements()].reverse().find((element) => {
+          if (!isBlock(element) || element.opacity === 0) return false;
+          return (
+            point.x >= element.x &&
+            point.x <= element.x + element.width &&
+            point.y >= element.y &&
+            point.y <= element.y + element.height
+          );
+        });
+        const data = hit ? blockDataOf(hit) : null;
+        return hit && data ? { id: hit.id, data, width: hit.width, height: hit.height } : null;
+      },
+      setVisible: (id, visible) => {
+        const elements = current().map((element) =>
+          element.id === id ? update(element, { opacity: visible ? 100 : 0 }) : element,
+        );
+        api.updateScene(replaceScene(elements, false));
+      },
+      scrollTo: (id) => {
+        const element = api.getSceneElements().find((e) => e.id === id);
+        if (element) api.scrollToContent(element, { animate: true, fitToViewport: false });
       },
       select: (id) => {
         api.updateScene({

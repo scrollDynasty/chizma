@@ -31,6 +31,9 @@ export function QuestionCard({
 
 interface BlockPanelProps {
   block: SelectedBlock;
+  /** Short description of the block's action, or null. */
+  actionSummary: string | null;
+  onAction: () => void;
   onRefine: (instruction: string) => void;
   onDrawOver: () => void;
   onAnswer: (option: string) => void;
@@ -38,7 +41,15 @@ interface BlockPanelProps {
 }
 
 /** Shown when one generated block is selected: change it in words, draw over it, versions. */
-export function BlockPanel({ block, onRefine, onDrawOver, onAnswer, onStep }: BlockPanelProps) {
+export function BlockPanel({
+  block,
+  actionSummary,
+  onAction,
+  onRefine,
+  onDrawOver,
+  onAnswer,
+  onStep,
+}: BlockPanelProps) {
   const { t } = useTranslation();
   const [instruction, setInstruction] = useState("");
   const { data } = block;
@@ -53,6 +64,14 @@ export function BlockPanel({ block, onRefine, onDrawOver, onAnswer, onStep }: Bl
   return (
     <div className={`${panel} w-full max-w-2xl`}>
       {data.question ? <QuestionCard question={data.question} onAnswer={onAnswer} /> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" onClick={onAction}>
+          {t("action.button")}
+        </Button>
+        <span className="truncate text-sm text-muted-foreground">
+          {actionSummary ?? t("action.none")}
+        </span>
+      </div>
       <form className="flex flex-wrap items-center gap-2" onSubmit={submit}>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">{data.label}</span>
         <input

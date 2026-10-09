@@ -74,3 +74,16 @@ Select one generated block to get its panel:
 - **Clarifying questions**: when the model is unsure it asks one question with options; the answer is sent as a refinement and the question disappears.
 
 Refinements count towards the same daily quota and budget as full generations.
+
+## Actions (M3)
+
+A block can do one thing from a fixed, audited registry (`apps/api/src/chizma_api/actions/schemas.py`, mirrored in `apps/web/src/actions/types.ts`):
+
+| Action | Settings |
+|---|---|
+| `link` | `url` (https/http/mailto/tel only), `new_tab` |
+| `modal` | `title`, `text`, optional `form` (fields, button text, success message, server form id) |
+| `toggle` | `target_id` (another block), `start_hidden` |
+| `scroll` | `target_id` (another block) |
+
+`POST /v1/actions/suggest` lets the model pick and configure one action from words; it never writes code. **Try** mode in the editor runs actions with the editor's own code (generated code never runs). Forms: `POST /v1/forms` (owner) registers a form; `POST /v1/forms/{id}/submissions` is public (required fields, honeypot `_hp`, 5 per minute per client); `GET /v1/forms` and `GET /v1/forms/{id}/submissions` show requests to the owner.

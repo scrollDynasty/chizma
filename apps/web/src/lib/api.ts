@@ -151,3 +151,45 @@ export function startRefine(request: RefineRequest) {
     body: form,
   });
 }
+
+export interface SuggestRequest {
+  instruction: string;
+  block: { id: string; kind: string; label: string };
+  targets: { id: string; kind: string; label: string }[];
+  locale: string;
+}
+
+export const suggestAction = (request: SuggestRequest) =>
+  apiFetch<{ action: import("@/actions/types").Action | null; explanation: string }>(
+    "/v1/actions/suggest",
+    { method: "POST", body: JSON.stringify(request) },
+  );
+
+export interface FormInfo {
+  id: string;
+  name: string;
+  fields: import("@/actions/types").FormField[];
+  submissions: number;
+  created_at: string;
+}
+
+export interface Submission {
+  id: number;
+  data: Record<string, string>;
+  created_at: string;
+}
+
+export const createForm = (name: string, fields: import("@/actions/types").FormField[]) =>
+  apiFetch<FormInfo>("/v1/forms", { method: "POST", body: JSON.stringify({ name, fields }) });
+
+export const listForms = (signal?: AbortSignal) => apiFetch<FormInfo[]>("/v1/forms", { signal });
+
+export const listSubmissions = (formId: string, signal?: AbortSignal) =>
+  apiFetch<Submission[]>(`/v1/forms/${encodeURIComponent(formId)}/submissions`, { signal });
+
+/** Public endpoint used by published sites; also used by "Try" mode in the editor. */
+export const submitForm = (formId: string, values: Record<string, string>) =>
+  apiFetch<{ ok: boolean }>(`/v1/forms/${encodeURIComponent(formId)}/submissions`, {
+    method: "POST",
+    body: JSON.stringify(values),
+  });
