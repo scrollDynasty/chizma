@@ -91,6 +91,17 @@ describe("buildPage", () => {
     expect(page).toContain('class="chz-cell chz-flow" data-el="title">');
   });
 
+  it("lets content blocks such as card grids grow with their content", () => {
+    const cards = element("cards", "cards", 0, 0, 1, 0.5);
+    const html = buildPage(
+      { ...scene, elements: [cards] },
+      [{ element_id: "cards", html: "<div></div>", css: "" }],
+      { aspect: 1, sanitizeHtml: (h) => h },
+    );
+
+    expect(html).toContain('class="chz-cell chz-flow" data-el="cards">');
+  });
+
   it("collapses rows into one column on phones", () => {
     expect(page).toContain(
       "@media (max-width:640px){.chz-row{grid-template-columns:1fr!important}",
