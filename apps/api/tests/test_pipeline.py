@@ -90,6 +90,7 @@ async def test_blocks_are_sanitised_and_unknown_ids_dropped() -> None:
 
 async def test_out_of_range_numbers_are_clamped() -> None:
     scene = json.loads(await _valid_scene())
+    scene["elements"][0]["source_shape_ids"] = []  # no shapes: the model estimate is used
     scene["elements"][0]["bbox"] = {"x": -0.2, "y": 0.1, "w": 1.7, "h": 0.5}
     scene["elements"][0]["confidence"] = 3
     blocks = json.dumps({"blocks": []})
@@ -99,3 +100,18 @@ async def test_out_of_range_numbers_are_clamped() -> None:
 
     first = result.scene.elements[0]
     assert (first.bbox.x, first.bbox.w, first.confidence) == (0.0, 1.0, 1.0)
+
+
+async def test_positions_come_from_the_drawn_shapes_not_the_model() -> None:
+    scene = json.loads(await _valid_scene())
+    # The model groups roof + walls into one house but guesses its position badly.
+    scene["elements"] = [scene["elements"][1]]
+    scene["elements"][0]["source_shape_ids"] = ["roof", "walls"]
+    scene["elements"][0]["bbox"] = {"x": 0.5, "y": 0.5, "w": 0.1, "h": 0.1}
+    provider = ScriptedProvider([json.dumps(scene)], [json.dumps({"blocks": []})])
+
+    result = await run_pipeline(provider, house_and_sun())
+
+    bbox = result.scene.elements[0].bbox
+    assert (bbox.x, bbox.y) == (0.0, pytest.approx(40 / 220))
+    assert (bbox.w, bbox.h) == (pytest.approx(160 / 380), pytest.approx(180 / 220))

@@ -5,9 +5,9 @@ output: every property required, nulls explicit). The Pydantic models re-validat
 answer and clamp numbers into range, because strict mode does not enforce min/max.
 """
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
 Locale = Literal["uz-Latn", "uz-Cyrl", "ru", "en"]
 LOCALES: tuple[str, ...] = ("uz-Latn", "uz-Cyrl", "ru", "en")
@@ -15,6 +15,11 @@ LOCALES: tuple[str, ...] = ("uz-Latn", "uz-Cyrl", "ru", "en")
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, value))
+
+
+def _cut(limit: int) -> BeforeValidator:
+    """Trim over-long model output instead of rejecting it (a retry costs money and time)."""
+    return BeforeValidator(lambda value: value[:limit] if isinstance(value, str | list) else value)
 
 
 class _Strict(BaseModel):
@@ -36,14 +41,14 @@ class BBox(_Strict):
 
 
 class StyleHints(_Strict):
-    colors: list[str] = Field(max_length=8)
-    shape: str = Field(max_length=40)
-    notes: str = Field(max_length=300)
+    colors: Annotated[list[str], _cut(8)]
+    shape: Annotated[str, _cut(80)]
+    notes: Annotated[str, _cut(300)]
 
 
 class Alternative(_Strict):
-    kind: str = Field(max_length=40)
-    label: str = Field(max_length=80)
+    kind: Annotated[str, _cut(40)]
+    label: Annotated[str, _cut(80)]
     confidence: float
 
     @field_validator("confidence")
@@ -54,16 +59,16 @@ class Alternative(_Strict):
 
 class Element(_Strict):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,40}$")
-    kind: str = Field(max_length=40)
-    label: str = Field(max_length=80)
-    intent: str = Field(max_length=300)
+    kind: Annotated[str, _cut(40)]
+    label: Annotated[str, _cut(80)]
+    intent: Annotated[str, _cut(300)]
     bbox: BBox
     confidence: float
     parent_id: str | None
-    source_shape_ids: list[str] = Field(max_length=200)
-    text: str | None = Field(max_length=500)
+    source_shape_ids: Annotated[list[str], _cut(200)]
+    text: Annotated[str | None, _cut(500)]
     style_hints: StyleHints
-    alternatives: list[Alternative] = Field(max_length=4)
+    alternatives: Annotated[list[Alternative], _cut(4)]
 
     @field_validator("confidence")
     @classmethod
@@ -73,22 +78,22 @@ class Element(_Strict):
 
 class Question(_Strict):
     element_id: str
-    text: str = Field(max_length=200)
-    options: list[str] = Field(max_length=5)
+    text: Annotated[str, _cut(200)]
+    options: Annotated[list[str], _cut(5)]
 
 
 class PageInfo(_Strict):
-    title: str = Field(max_length=80)
+    title: Annotated[str, _cut(80)]
     locale: Locale
-    palette: list[str] = Field(max_length=8)
-    mood: str = Field(max_length=60)
+    palette: Annotated[list[str], _cut(8)]
+    mood: Annotated[str, _cut(60)]
 
 
 class SceneGraph(_Strict):
     schema_version: Literal["0.1"]
     page: PageInfo
-    elements: list[Element] = Field(max_length=40)
-    questions: list[Question] = Field(max_length=10)
+    elements: Annotated[list[Element], _cut(40)]
+    questions: Annotated[list[Question], _cut(10)]
 
 
 class Block(_Strict):
@@ -98,7 +103,7 @@ class Block(_Strict):
 
 
 class BlockSet(_Strict):
-    blocks: list[Block] = Field(max_length=40)
+    blocks: Annotated[list[Block], _cut(40)]
 
 
 def _obj(properties: dict[str, Any]) -> dict[str, Any]:
