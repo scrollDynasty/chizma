@@ -13,6 +13,10 @@
 3. **Budget alerts**: Azure portal > Cost Management > Budgets, monthly budget with alerts at $5 and $20.
 4. **Releases**: Settings > Actions > General > allow GitHub Actions to create pull requests (needed by release-please).
 
+## Releasing
+
+release-please keeps a release PR open (`chore(main): release x.y.z`). Because it is opened by GitHub Actions, its CI run waits for approval: open the PR, click **Approve workflows to run** (or `gh api -X POST repos/<owner>/chizma/actions/runs/<run-id>/approve`), wait for green checks, then merge. Merging creates the tag, the GitHub Release and the Docker images in GHCR.
+
 ## Secrets
 
 Secrets are set **only** in the Azure portal (Web app > Settings > Environment variables), never in the repository:
