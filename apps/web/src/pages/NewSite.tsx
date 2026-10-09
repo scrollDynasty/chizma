@@ -5,11 +5,12 @@ import { Link } from "react-router";
 import { describeAction } from "@/actions/describe";
 import type { Action } from "@/actions/types";
 import { stepVersion, withNewVersion } from "@/canvas/blocks";
-import type { CanvasHandle, SelectedBlock, StrokesOver } from "@/canvas/SketchCanvas";
+import type { CanvasHandle, PageLayout, SelectedBlock, StrokesOver } from "@/canvas/SketchCanvas";
 import type { SketchBounds } from "@/canvas/shapes";
 import { ActionEditor } from "@/components/ActionEditor";
 import { BlockPanel, DrawOverBar, QuestionCard } from "@/components/BlockPanel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SitePreview } from "@/components/SitePreview";
 import { SubmissionsDialog } from "@/components/SubmissionsDialog";
 import { TryLayer } from "@/components/TryLayer";
 import { UserMenu } from "@/components/UserMenu";
@@ -81,6 +82,7 @@ export function NewSite() {
   const [error, setError] = useState<string | null>(null);
   const [actionFor, setActionFor] = useState<SelectedBlock | null>(null);
   const [showSubmissions, setShowSubmissions] = useState(false);
+  const [site, setSite] = useState<PageLayout | null>(null);
   const { state, generate, refine } = useGeneration();
   const quota = useQuery({ queryKey: ["quota"], queryFn: ({ signal }) => fetchQuota(signal) });
 
@@ -263,6 +265,13 @@ export function NewSite() {
               {t("gen.quota", { remaining: quota.data.remaining, limit: quota.data.limit })}
             </span>
           ) : null}
+          <Button
+            variant="outline"
+            disabled={mode !== "draw"}
+            onClick={() => setSite(canvas.current?.pageLayout() ?? null)}
+          >
+            {t("site.open")}
+          </Button>
           <Button variant="ghost" onClick={() => setShowSubmissions(true)}>
             {t("submissions.button")}
           </Button>
@@ -393,6 +402,8 @@ export function NewSite() {
       ) : null}
 
       {showSubmissions ? <SubmissionsDialog onClose={() => setShowSubmissions(false)} /> : null}
+
+      {site ? <SitePreview layout={site} onClose={() => setSite(null)} /> : null}
     </div>
   );
 }
