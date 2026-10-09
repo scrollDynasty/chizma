@@ -9,7 +9,7 @@
 ## One-time setup
 
 1. **GitHub Pages**: Settings > Pages > Source: *GitHub Actions*.
-2. **Azure**: `az login`, then `./infra/azure/setup.sh`. It creates a free F1 Linux plan and the web app, an OIDC identity for GitHub Actions, and sets repository variables (`AZURE_*`, `CHIZMA_API_URL`).
+2. **Azure**: `az login` (add `--tenant <id>` if MFA is required), then `./infra/azure/setup.sh` (default region `germanywestcentral`; Azure for Students only allows a few regions). It creates a free F1 Linux plan and the web app, an OIDC identity for GitHub Actions, and sets repository variables (`AZURE_*`, `CHIZMA_API_URL`).
 3. **Budget alerts**: Azure portal > Cost Management > Budgets, monthly budget with alerts at $5 and $20.
 4. **Releases**: Settings > Actions > General > allow GitHub Actions to create pull requests (needed by release-please).
 
