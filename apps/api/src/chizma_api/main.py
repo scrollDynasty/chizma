@@ -10,6 +10,10 @@ from chizma_api.auth.providers import AuthlibGateway, OAuthGateway
 from chizma_api.auth.routes import router as auth_router
 from chizma_api.config import Settings, get_settings
 from chizma_api.db import create_db_engine, create_session_factory
+from chizma_api.generation.jobs import JobStore
+from chizma_api.generation.limits import RateLimiter
+from chizma_api.generation.providers import AIProvider, make_provider
+from chizma_api.generation.routes import router as generation_router
 
 
 class Health(BaseModel):
@@ -18,7 +22,9 @@ class Health(BaseModel):
 
 
 def create_app(
-    settings: Settings | None = None, oauth_gateway: OAuthGateway | None = None
+    settings: Settings | None = None,
+    oauth_gateway: OAuthGateway | None = None,
+    ai_provider: AIProvider | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
@@ -30,6 +36,9 @@ def create_app(
     app.state.settings = settings
     app.state.session_factory = create_session_factory(create_db_engine(settings.database_url))
     app.state.oauth_gateway = oauth_gateway or AuthlibGateway(settings)
+    app.state.ai_provider = ai_provider or make_provider(settings)
+    app.state.jobs = JobStore()
+    app.state.rate_limiter = RateLimiter(settings.min_seconds_between_generations)
 
     app.add_middleware(
         CORSMiddleware,
@@ -48,6 +57,7 @@ def create_app(
     )
 
     app.include_router(auth_router)
+    app.include_router(generation_router)
 
     @app.get("/health")
     def health() -> Health:

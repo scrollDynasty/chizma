@@ -11,6 +11,7 @@ import chizma_api.models  # noqa: F401  (registers tables)
 from chizma_api.auth.providers import OAuthFailedError, OAuthProfile
 from chizma_api.config import Settings
 from chizma_api.db import Base
+from chizma_api.generation.providers import AIProvider
 from chizma_api.main import create_app
 
 TEST_SECRET = "test-secret-that-is-long-enough-for-hs256-signing"
@@ -52,8 +53,10 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     return Settings.model_validate(values)
 
 
-def build_app(settings: Settings, gateway: FakeGateway) -> FastAPI:
-    app = create_app(settings, oauth_gateway=gateway)
+def build_app(
+    settings: Settings, gateway: FakeGateway, provider: AIProvider | None = None
+) -> FastAPI:
+    app = create_app(settings, oauth_gateway=gateway, ai_provider=provider)
     Base.metadata.create_all(app.state.session_factory.kw["bind"])
     return app
 
@@ -65,8 +68,8 @@ def gateway() -> FakeGateway:
 
 @pytest.fixture
 def client_factory(tmp_path: Path, gateway: FakeGateway) -> Iterator[Callable[..., TestClient]]:
-    def factory(**overrides: Any) -> TestClient:
-        return TestClient(build_app(make_settings(tmp_path, **overrides), gateway))
+    def factory(provider: AIProvider | None = None, **overrides: Any) -> TestClient:
+        return TestClient(build_app(make_settings(tmp_path, **overrides), gateway, provider))
 
     yield factory
 
