@@ -1,0 +1,24 @@
+{
+  "name": "chizma",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @chizma/web dev",
+    "dev:api": "cd apps/api && uv run fastapi dev src/chizma_api/main.py",
+    "build": "pnpm -r build",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check:api": "cd apps/api && uv run ruff check && uv run ruff format --check && uv run mypy && uv run pytest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "typescript": "7.0.2"
+  }
+}
