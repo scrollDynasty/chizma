@@ -1,0 +1,12 @@
+# Synced to GitHub with scripts/sync-labels.sh
+- { name: bug, color: d73a4a, description: Something does not work }
+- { name: idea, color: a2eeef, description: Feature or improvement proposal }
+- { name: good first issue, color: 7057ff, description: Good for newcomers }
+- { name: help wanted, color: 008672, description: Extra attention is welcome }
+- { name: "area: web", color: 1d76db, description: Editor and landing page }
+- { name: "area: api", color: 0e8a16, description: FastAPI backend }
+- { name: "area: ai", color: fbca04, description: Recognition and generation }
+- { name: "area: sandbox", color: b60205, description: Isolation of generated code }
+- { name: "area: infra", color: 5319e7, description: CI, Docker, hosting }
+- { name: "area: docs", color: 0075ca, description: Documentation }
+- { name: "area: i18n", color: c5def5, description: Translations }

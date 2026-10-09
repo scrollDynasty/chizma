@@ -1,0 +1,21 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch or screenshot
+      description: If the bug is about generation, attach the drawing (only if you are happy to share it).
+  - type: input
+    id: env
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 140 on Windows 11
