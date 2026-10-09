@@ -4,7 +4,13 @@ import pytest
 
 from chizma_api.generation.fake import FakeProvider
 from chizma_api.generation.pipeline import InvalidModelOutputError, run_pipeline
-from chizma_api.generation.providers import ModelReply, RefineInput, SketchInput, Usage
+from chizma_api.generation.providers import (
+    ModelReply,
+    RefineInput,
+    SketchInput,
+    SuggestInput,
+    Usage,
+)
 from chizma_api.generation.schemas import SceneGraph
 from tests.sketches import house_and_sun
 
@@ -46,6 +52,10 @@ class ScriptedProvider:
     async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
         self.feedback.append(feedback)
         return ModelReply(self.blocks.pop(0), Usage(20, 50, 0.002, 1))
+
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply:
+        self.feedback.append(feedback)
+        return ModelReply(self.blocks.pop(0), Usage(5, 5, 0.0001, 1))
 
 
 async def _valid_scene() -> str:

@@ -9,7 +9,13 @@ import re
 from html import escape
 from typing import Any
 
-from chizma_api.generation.providers import ModelReply, RefineInput, SketchInput, Usage
+from chizma_api.generation.providers import (
+    ModelReply,
+    RefineInput,
+    SketchInput,
+    SuggestInput,
+    Usage,
+)
 from chizma_api.generation.schemas import SceneGraph
 
 _KIND = {
@@ -117,6 +123,9 @@ class FakeProvider:
         block = {"element_id": refine.element.id, **_refine(refine)}
         return ModelReply(text=json.dumps({"blocks": [block]}), usage=Usage(calls=1))
 
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply:
+        return ModelReply(text=json.dumps(_suggest(suggest)), usage=Usage(calls=1))
+
 
 def _render(shape: str, text: str | None, colors: list[str]) -> dict[str, str]:
     stroke = colors[0] if colors else "#1e1e1e"
@@ -188,3 +197,38 @@ def _refine(refine: RefineInput) -> dict[str, str]:
         css += ".drawn{position:absolute;inset:0;width:100%;height:100%;}"
     css += ".refined{position:relative;width:100%;height:100%;}"
     return {"html": f'<div class="refined">{html}</div>', "css": css}
+
+
+_URL = re.compile(r"(https?://\S+|mailto:\S+|tel:\+?[0-9 ()-]+)", re.I)
+
+
+def _suggest(suggest: SuggestInput) -> dict[str, object]:
+    """Keyword rules standing in for the model: link, form window, toggle or scroll."""
+    text = suggest.instruction.lower()
+    answer: dict[str, object] = {
+        "type": "none", "url": None, "new_tab": True, "title": None, "text": None,
+        "with_form": False, "form_fields": [], "submit_label": None, "success_text": None,
+        "target_id": None, "explanation": "",
+    }  # fmt: skip
+    target = suggest.targets[0]["id"] if suggest.targets else None
+    url = _URL.search(suggest.instruction)
+    if url:
+        answer.update(type="link", url=url.group(1).strip(), explanation="link")
+    elif any(w in text for w in ("форм", "заяв", "запис", "form", "book", "ariza", "yozil")):
+        answer.update(
+            type="modal", title=suggest.instruction.strip()[:80], text="", with_form=True,
+            form_fields=[
+                {"name": "name", "label": "Name", "type": "text", "required": True},
+                {"name": "phone", "label": "Phone", "type": "tel", "required": True},
+            ],
+            submit_label="OK", success_text="Thank you!", explanation="form",
+        )  # fmt: skip
+    elif target and any(w in text for w in ("показ", "скр", "раскр", "show", "hide", "toggle")):
+        answer.update(type="toggle", target_id=target, explanation="toggle")
+    elif target and any(w in text for w in ("прокрут", "перейти к", "scroll", "jump")):
+        answer.update(type="scroll", target_id=target, explanation="scroll")
+    elif any(w in text for w in ("окно", "modal", "popup", "oyna")):
+        answer.update(
+            type="modal", title=suggest.instruction.strip()[:80], text="", explanation="modal"
+        )
+    return answer

@@ -97,3 +97,25 @@ Rules:
 - Return exactly one block with the same element_id.
 Return only the JSON object.
 """
+
+SUGGEST_ACTION = """\
+You configure what a block on a small business website does when a visitor clicks it.
+Pick exactly one action from this fixed list and fill its settings from the request.
+You never write code.
+
+Actions:
+- link: open a web address, email (mailto:) or phone (tel:). Fill url. new_tab true for
+  external sites. Use only an address the person gave; never invent one. If they asked for
+  a link but gave no address, choose none and say what is missing in explanation.
+- modal: open a window with a title and text in the page locale. Set with_form true and list
+  form_fields when the window should collect data (booking, order, contact): fields have a
+  name (lowercase latin, digits, underscore), a label in the page locale, a type (text, tel,
+  email, textarea) and required. Fill submit_label and success_text in the page locale.
+- toggle: show or hide another block. target_id must be one of the given target ids.
+- scroll: scroll to another block. target_id must be one of the given target ids.
+- none: when the request does not fit any action.
+
+Unused settings are null (or false / empty list). explanation is one short sentence in the
+page locale describing what the block will do.
+Return only the JSON object.
+"""

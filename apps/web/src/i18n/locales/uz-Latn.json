@@ -86,5 +86,62 @@
     "title": "Nimadir xato ketdi",
     "body": "Chizmangiz shu brauzerda saqlangan. Davom etish uchun sahifani qayta yuklang.",
     "reload": "Qayta yuklash"
+  },
+  "action": {
+    "button": "Amal",
+    "title": "Blok nima qiladi",
+    "none": "Amalsiz",
+    "remove": "Amalni olib tashlash",
+    "save": "Saqlash",
+    "types": {
+      "link": "Havolaga o‘tish",
+      "modal": "Oyna ochish",
+      "toggle": "Blokni ko‘rsatish / yashirish",
+      "scroll": "Blokka aylantirish"
+    },
+    "url": "Manzil (https://…, mailto:, tel:)",
+    "newTab": "Yangi oynada ochish",
+    "modalTitle": "Oyna sarlavhasi",
+    "modalText": "Matn",
+    "withForm": "Ariza yig‘ish (forma)",
+    "fields": "Forma maydonlari",
+    "submitLabel": "Tugma matni",
+    "successText": "Yuborilgandan keyingi xabar",
+    "target": "Qaysi blok",
+    "startHidden": "Boshida yashirin",
+    "describe": "Yoki so‘z bilan yozing: «yozilish oynasini och»",
+    "suggest": "Tanlash",
+    "invalid": "Sozlamalarni tekshiring: havola https://, mailto: yoki tel: bilan boshlanishi kerak.",
+    "summary": {
+      "link": "→ {{url}}",
+      "modal": "oyna «{{title}}»",
+      "toggle": "«{{target}}»ni ko‘rsatish/yashirish",
+      "scroll": "«{{target}}»ga aylantirish"
+    },
+    "presets": {
+      "name": "Ism",
+      "phone": "Telefon",
+      "email": "Email",
+      "message": "Izoh"
+    },
+    "defaults": {
+      "submit": "Yuborish",
+      "success": "Rahmat! Tez orada siz bilan bog‘lanamiz."
+    }
+  },
+  "try": {
+    "start": "Sinab ko‘rish",
+    "stop": "To‘xtatish",
+    "hint": "Sinov rejimi: bloklarni bosing"
+  },
+  "modal": {
+    "close": "Yopish"
+  },
+  "submissions": {
+    "button": "Arizalar",
+    "title": "Formalardan arizalar",
+    "empty": "Hozircha formalar yo‘q. Blokka forma bilan oyna biriktiring.",
+    "none": "Hozircha arizalar yo‘q.",
+    "count": "Arizalar: {{count}}"
   }
 }

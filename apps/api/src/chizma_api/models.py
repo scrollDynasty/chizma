@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from chizma_api.db import Base
@@ -54,3 +54,26 @@ class DailySpend(Base):
     day: Mapped[str] = mapped_column(String(10), primary_key=True)
     usd: Mapped[float] = mapped_column(Float, default=0.0)
     generations: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Form(Base):
+    """A form placed on a generated site; its owner reads the submissions."""
+
+    __tablename__ = "forms"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    fields_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class FormSubmission(Base):
+    """One filled-in form. Only declared fields are stored; no IP addresses."""
+
+    __tablename__ = "form_submissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    form_id: Mapped[str] = mapped_column(ForeignKey("forms.id", ondelete="CASCADE"), index=True)
+    data_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

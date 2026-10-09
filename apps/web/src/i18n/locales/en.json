@@ -86,5 +86,62 @@
     "title": "Something went wrong",
     "body": "Your drawing is saved in this browser. Reload the page to continue.",
     "reload": "Reload"
+  },
+  "action": {
+    "button": "Action",
+    "title": "What the block does",
+    "none": "No action",
+    "remove": "Remove action",
+    "save": "Save",
+    "types": {
+      "link": "Open a link",
+      "modal": "Open a window",
+      "toggle": "Show / hide a block",
+      "scroll": "Scroll to a block"
+    },
+    "url": "Address (https://…, mailto:, tel:)",
+    "newTab": "Open in a new tab",
+    "modalTitle": "Window title",
+    "modalText": "Text",
+    "withForm": "Collect a request (form)",
+    "fields": "Form fields",
+    "submitLabel": "Button text",
+    "successText": "Message after sending",
+    "target": "Which block",
+    "startHidden": "Hidden at first",
+    "describe": "Or describe it: “open a booking window”",
+    "suggest": "Suggest",
+    "invalid": "Check the settings: the link must start with https://, mailto: or tel:.",
+    "summary": {
+      "link": "→ {{url}}",
+      "modal": "window “{{title}}”",
+      "toggle": "shows/hides “{{target}}”",
+      "scroll": "scrolls to “{{target}}”"
+    },
+    "presets": {
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email",
+      "message": "Message"
+    },
+    "defaults": {
+      "submit": "Send",
+      "success": "Thank you! We will contact you soon."
+    }
+  },
+  "try": {
+    "start": "Try it",
+    "stop": "Stop",
+    "hint": "Try mode: click the blocks to see what they do"
+  },
+  "modal": {
+    "close": "Close"
+  },
+  "submissions": {
+    "button": "Requests",
+    "title": "Requests from forms",
+    "empty": "No forms yet. Add a window with a form to a block.",
+    "none": "No requests yet.",
+    "count": "{{count}} requests"
   }
 }

@@ -1,3 +1,4 @@
+import type { Action } from "@/actions/types";
 import type { Block, SceneElement, SceneGraph } from "@/lib/scene";
 
 /**
@@ -30,6 +31,8 @@ export interface BlockData {
   current: number;
   /** A clarifying question the model asked about this block, until it is answered. */
   question: BlockQuestion | null;
+  /** What happens when a visitor clicks the block (from the safe action registry). */
+  action: Action | null;
 }
 
 /** Saved on a sketch shape while it is hidden behind a pending result. */
@@ -70,6 +73,7 @@ export function blockDataOf(element: WithCustomData): BlockData | null {
     versions,
     current,
     question: data.question ?? null,
+    action: data.action ?? null,
   };
 }
 
@@ -109,6 +113,7 @@ export function blockData(
     versions: [{ html: block.html, css: block.css }],
     current: 0,
     question,
+    action: null,
   };
 }
 

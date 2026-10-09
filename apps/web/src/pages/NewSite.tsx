@@ -2,11 +2,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
+import { describeAction } from "@/actions/describe";
+import type { Action } from "@/actions/types";
 import { stepVersion, withNewVersion } from "@/canvas/blocks";
 import type { CanvasHandle, SelectedBlock, StrokesOver } from "@/canvas/SketchCanvas";
 import type { SketchBounds } from "@/canvas/shapes";
+import { ActionEditor } from "@/components/ActionEditor";
 import { BlockPanel, DrawOverBar, QuestionCard } from "@/components/BlockPanel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SubmissionsDialog } from "@/components/SubmissionsDialog";
+import { TryLayer } from "@/components/TryLayer";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { fetchQuota } from "@/lib/api";
@@ -46,7 +51,7 @@ const KNOWN_ERRORS = new Set([
  *
  * Only the canvas is locked while a request runs or a result waits for a decision.
  */
-type Mode = "draw" | "generating" | "deciding" | "drawOver" | "refining";
+type Mode = "draw" | "generating" | "deciding" | "drawOver" | "refining" | "try";
 
 interface RefineTarget {
   id: string;
@@ -74,6 +79,8 @@ export function NewSite() {
   const [pendingBlocks, setPendingBlocks] = useState<SelectedBlock[]>([]);
   const [drawOver, setDrawOver] = useState<DrawOver | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionFor, setActionFor] = useState<SelectedBlock | null>(null);
+  const [showSubmissions, setShowSubmissions] = useState(false);
   const { state, generate, refine } = useGeneration();
   const quota = useQuery({ queryKey: ["quota"], queryFn: ({ signal }) => fetchQuota(signal) });
 
@@ -216,6 +223,23 @@ export function NewSite() {
     setMode("draw");
   };
 
+  /** Block names for menus: "label", or "label 2" when several blocks share it. */
+  const labelOf = (id: string) => {
+    const blocks = canvas.current?.allBlocks() ?? [];
+    const block = blocks.find((b) => b.id === id);
+    if (!block) return id;
+    const same = blocks.filter((b) => b.data.label === block.data.label);
+    return same.length > 1 ? `${block.data.label} ${same.indexOf(block) + 1}` : block.data.label;
+  };
+
+  const saveAction = (action: Action | null) => {
+    if (!actionFor) return;
+    const current = canvas.current?.getBlock(actionFor.id);
+    if (current) canvas.current?.updateBlock(actionFor.id, { ...current.data, action });
+    setActionFor(null);
+    window.setTimeout(() => canvas.current?.select(actionFor.id), 0);
+  };
+
   const busy = mode === "generating" || mode === "refining";
   const stage = state.phase === "working" ? state.stage : "uploading";
   const questions = pendingBlocks.filter((block) => block.data.question);
@@ -239,6 +263,16 @@ export function NewSite() {
               {t("gen.quota", { remaining: quota.data.remaining, limit: quota.data.limit })}
             </span>
           ) : null}
+          <Button variant="ghost" onClick={() => setShowSubmissions(true)}>
+            {t("submissions.button")}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={mode !== "draw" && mode !== "try"}
+            onClick={() => setMode(mode === "try" ? "draw" : "try")}
+          >
+            {mode === "try" ? `■ ${t("try.stop")}` : `▶ ${t("try.start")}`}
+          </Button>
           <Button onClick={startGeneration} disabled={sketchCount === 0 || mode !== "draw"}>
             {t("canvas.generate")}
           </Button>
@@ -252,7 +286,7 @@ export function NewSite() {
           <Suspense fallback={<p className="p-6 text-muted-foreground">{t("canvas.loading")}</p>}>
             <SketchCanvas
               langCode={EXCALIDRAW_LANG[i18n.language] ?? "en"}
-              locked={busy || mode === "deciding"}
+              locked={busy || mode === "deciding" || mode === "try"}
               onReady={(handle) => {
                 canvas.current = handle;
               }}
@@ -261,6 +295,16 @@ export function NewSite() {
             />
           </Suspense>
         </div>
+
+        {mode === "try" && canvas.current ? <TryLayer canvas={canvas.current} /> : null}
+
+        {mode === "try" ? (
+          <div className="pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
+            <p className="rounded-full bg-foreground px-5 py-2.5 text-sm text-background shadow-[var(--shadow-soft)]">
+              {t("try.hint")}
+            </p>
+          </div>
+        ) : null}
 
         {busy ? (
           <GenerationLoader
@@ -315,6 +359,10 @@ export function NewSite() {
             <BlockPanel
               key={selected.id}
               block={selected}
+              actionSummary={
+                selected.data.action ? describeAction(selected.data.action, labelOf, t) : null
+              }
+              onAction={() => setActionFor(selected)}
               onRefine={(instruction) => void startRefine(selected, { instruction }, "draw")}
               onDrawOver={() => beginDrawOver(selected)}
               onAnswer={(option) => answer(selected, option, "draw")}
@@ -333,6 +381,18 @@ export function NewSite() {
           ) : null}
         </div>
       </section>
+
+      {actionFor ? (
+        <ActionEditor
+          block={actionFor}
+          targets={(canvas.current?.allBlocks() ?? []).filter((b) => b.id !== actionFor.id)}
+          labelOf={labelOf}
+          onSave={saveAction}
+          onClose={() => setActionFor(null)}
+        />
+      ) : null}
+
+      {showSubmissions ? <SubmissionsDialog onClose={() => setShowSubmissions(false)} /> : null}
     </div>
   );
 }

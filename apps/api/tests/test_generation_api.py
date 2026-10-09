@@ -4,7 +4,13 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from chizma_api.generation.providers import AIProviderError, ModelReply, RefineInput, SketchInput
+from chizma_api.generation.providers import (
+    AIProviderError,
+    ModelReply,
+    RefineInput,
+    SketchInput,
+    SuggestInput,
+)
 from chizma_api.generation.schemas import SceneGraph
 from tests.sketches import HOUSE_AND_SUN, PNG
 
@@ -111,6 +117,9 @@ class BrokenProvider:
         raise AIProviderError("RateLimitError")
 
     async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
+        raise AIProviderError("RateLimitError")
+
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply:
         raise AIProviderError("RateLimitError")
 
 
