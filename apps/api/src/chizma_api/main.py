@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -21,12 +23,19 @@ class Health(BaseModel):
     version: str
 
 
+def configure_logging() -> None:
+    """Show our INFO lines (generation outcome, cost) in the App Service log stream."""
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("chizma_api").setLevel(logging.INFO)
+
+
 def create_app(
     settings: Settings | None = None,
     oauth_gateway: OAuthGateway | None = None,
     ai_provider: AIProvider | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging()
     app = FastAPI(
         title="Chizma API",
         version=__version__,
