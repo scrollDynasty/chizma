@@ -11,9 +11,16 @@ canvas (Excalidraw)
        element: { id, kind, label, bbox, confidence, style_hints, alternatives[] }
   -> block generator -> HTML/CSS/SVG per element (no JavaScript) -> server-side checks
   -> element boxes recomputed from the drawn shapes (1:1 with the sketch)
-  -> result shown in place of the sketch, in a sandboxed iframe of the same size
-  -> Back to drawing / Try again / Accept (accepted result kept in the browser for now)
+  -> result put on the canvas in place of its strokes (canvas locked while deciding)
+  -> Back to drawing / Try again / Accept
+  -> accepted blocks are ordinary canvas objects: move, resize, delete, undo, draw more,
+     generate again (only new strokes are sent)
 ```
+
+Blocks are Excalidraw `iframe` elements. Their document is built by us: HTML sanitised on the
+server and again with DOMPurify, wrapped in a CSP with `default-src 'none'` (no scripts, no
+network), inside an iframe without `allow-same-origin` (no access to the editor, its storage or
+sign-in token).
 
 Generation is **1:1**: every drawn object becomes exactly one real element at the same place
 and size, and nothing is invented. People refine blocks afterwards (M2). The responsive page

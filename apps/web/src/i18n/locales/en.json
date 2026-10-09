@@ -65,8 +65,6 @@
     "back": "Back to drawing",
     "again": "Try again",
     "accept": "Accept",
-    "accepted": "Accepted",
-    "edit": "Edit drawing",
     "unsure": "Not sure about: {{list}}"
   }
 }
