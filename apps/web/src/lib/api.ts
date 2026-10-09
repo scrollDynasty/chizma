@@ -120,3 +120,34 @@ export const fetchGeneration = (id: string, signal?: AbortSignal) =>
 
 export const fetchQuota = (signal?: AbortSignal) =>
   apiFetch<Quota>("/v1/generations/quota", { signal });
+
+export interface RefineRequest {
+  element: unknown;
+  html: string;
+  css: string;
+  /** Block size in canvas units; drawn strokes are positioned inside it. */
+  width: number;
+  height: number;
+  locale: string;
+  instruction?: string;
+  /** Strokes drawn over the block (PNG + shapes relative to the block). */
+  png?: Blob;
+  shapes?: unknown[];
+}
+
+export function startRefine(request: RefineRequest) {
+  const form = new FormData();
+  form.append("element", JSON.stringify(request.element));
+  form.append("html", request.html);
+  form.append("css", request.css);
+  form.append("width", String(Math.max(1, Math.round(request.width))));
+  form.append("height", String(Math.max(1, Math.round(request.height))));
+  form.append("locale", request.locale);
+  if (request.instruction) form.append("instruction", request.instruction);
+  if (request.shapes) form.append("shapes", JSON.stringify(request.shapes));
+  if (request.png) form.append("image", request.png, "drawn.png");
+  return apiFetch<{ id: string; status: string }>("/v1/generations/refine", {
+    method: "POST",
+    body: form,
+  });
+}

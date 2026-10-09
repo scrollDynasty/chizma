@@ -43,7 +43,8 @@
       "uploading": "Sending your drawing…",
       "queued": "Waiting in line…",
       "recognizing": "Recognising the drawing…",
-      "building": "Building the page…"
+      "building": "Building the page…",
+      "refining": "Changing the block…"
     },
     "empty": "Nothing to build yet: no elements were recognised.",
     "unsure": "Not sure about these, check them:",
@@ -58,7 +59,9 @@
       "ai_invalid_output": "The AI answered with something we could not use. Try again.",
       "image_too_large": "The drawing is too large. Try making it smaller.",
       "timeout": "Generation took too long. Try again.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "nothing_to_change": "Describe the change or draw over the block.",
+      "nothing_drawn": "Draw something over the block first."
     }
   },
   "result": {
@@ -66,5 +69,17 @@
     "again": "Try again",
     "accept": "Accept",
     "unsure": "Not sure about: {{list}}"
+  },
+  "block": {
+    "placeholder": "Describe the change…",
+    "apply": "Change",
+    "drawOver": "Draw over",
+    "drawHint": "Draw over “{{label}}”, then press Apply",
+    "applyDrawing": "Apply",
+    "cancel": "Cancel",
+    "nothingDrawn": "Draw something over the block first.",
+    "version": "{{n}} of {{total}}",
+    "previous": "Previous version",
+    "next": "Next version"
   }
 }

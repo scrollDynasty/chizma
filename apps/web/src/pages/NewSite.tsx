@@ -2,14 +2,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import type { CanvasHandle } from "@/canvas/SketchCanvas";
+import { stepVersion, withNewVersion } from "@/canvas/blocks";
+import type { CanvasHandle, SelectedBlock, StrokesOver } from "@/canvas/SketchCanvas";
 import type { SketchBounds } from "@/canvas/shapes";
+import { BlockPanel, DrawOverBar, QuestionCard } from "@/components/BlockPanel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { fetchQuota } from "@/lib/api";
-import { LOW_CONFIDENCE, type SceneElement } from "@/lib/scene";
-import { GenerationLoader } from "@/preview/GenerationLoader";
+import { GENERATION_STEPS, GenerationLoader, REFINE_STEPS } from "@/preview/GenerationLoader";
 import { useGeneration } from "@/preview/useGeneration";
 
 // Excalidraw is large; load it only on the editor page.
@@ -32,55 +33,95 @@ const KNOWN_ERRORS = new Set([
   "ai_invalid_output",
   "image_too_large",
   "timeout",
+  "nothing_to_change",
+  "nothing_drawn",
 ]);
 
 /**
  * draw --Generate--> generating --> deciding --Accept--> draw (blocks stay, keep editing)
- *   ^                                  |
- *   +-------- Back to drawing ---------+   Try again: back + generate once more
+ *   ^                                  | Back / Try again; answer a question -> refining
+ *   |
+ *   +-- select a block: change in words -> refining -> draw
+ *                       draw over -> drawOver --Apply--> refining -> draw
  *
- * The result is put on the canvas itself, in place of the strokes it came from. Accepted
- * blocks are ordinary canvas objects: move, resize, delete, undo, draw more, generate again.
+ * Only the canvas is locked while a request runs or a result waits for a decision.
  */
-type Mode = "draw" | "generating" | "deciding";
+type Mode = "draw" | "generating" | "deciding" | "drawOver" | "refining";
+
+interface RefineTarget {
+  id: string;
+  answered: boolean;
+  strokeIds: readonly string[];
+  returnTo: Mode;
+}
+
+interface DrawOver {
+  blockId: string;
+  label: string;
+  before: Set<string>;
+}
 
 export function NewSite() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const canvas = useRef<CanvasHandle | null>(null);
   const frame = useRef<SketchBounds | null>(null);
+  const job = useRef<"generate" | "refine">("generate");
+  const refineTarget = useRef<RefineTarget | null>(null);
   const [sketchCount, setSketchCount] = useState(0);
   const [mode, setMode] = useState<Mode>("draw");
-  const [unsure, setUnsure] = useState<SceneElement[]>([]);
+  const [selected, setSelected] = useState<SelectedBlock | null>(null);
+  const [pendingBlocks, setPendingBlocks] = useState<SelectedBlock[]>([]);
+  const [drawOver, setDrawOver] = useState<DrawOver | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { state, generate } = useGeneration();
+  const { state, generate, refine } = useGeneration();
   const quota = useQuery({ queryKey: ["quota"], queryFn: ({ signal }) => fetchQuota(signal) });
 
   useEffect(() => {
-    if (state.phase === "done") {
-      if (state.job.blocks.length === 0 || !frame.current) {
-        setError("empty");
-        setMode("draw");
-      } else {
-        canvas.current?.showResult(state.job, frame.current, i18n.language);
-        setUnsure((state.job.scene?.elements ?? []).filter((e) => e.confidence < LOW_CONFIDENCE));
-        setMode("deciding");
-      }
-    } else if (state.phase === "failed") {
-      setError(state.error);
-      setMode("draw");
-    }
     if (state.phase === "done" || state.phase === "failed") {
       void queryClient.invalidateQueries({ queryKey: ["quota"] });
     }
+    if (state.phase === "failed") {
+      setError(state.error);
+      setMode(job.current === "refine" ? (refineTarget.current?.returnTo ?? "draw") : "draw");
+      return;
+    }
+    if (state.phase !== "done") return;
+
+    if (job.current === "refine") {
+      const target = refineTarget.current;
+      const block = state.job.blocks[0];
+      const current = target ? canvas.current?.getBlock(target.id) : null;
+      if (target && block && current) {
+        const data = withNewVersion(current.data, block, target.answered);
+        canvas.current?.updateBlock(target.id, data);
+        if (target.strokeIds.length > 0) canvas.current?.removeElements(target.strokeIds);
+        setPendingBlocks((blocks) => blocks.map((b) => (b.id === target.id ? { ...b, data } : b)));
+      }
+      setMode(target?.returnTo ?? "draw");
+      // Keep the edited block selected so the next change is one step away.
+      if (target && target.returnTo === "draw") {
+        window.setTimeout(() => canvas.current?.select(target.id), 0);
+      }
+      return;
+    }
+
+    if (state.job.blocks.length === 0 || !frame.current) {
+      setError("empty");
+      setMode("draw");
+      return;
+    }
+    const added = canvas.current?.showResult(state.job, frame.current, i18n.language) ?? [];
+    setPendingBlocks(added);
+    setMode("deciding");
   }, [state, queryClient, i18n.language]);
 
   const startGeneration = async () => {
     const snapshot = await canvas.current?.snapshot();
     if (!snapshot) return;
     frame.current = snapshot.bounds;
+    job.current = "generate";
     setError(null);
-    setUnsure([]);
     setMode("generating");
     await generate({
       png: snapshot.png,
@@ -91,24 +132,93 @@ export function NewSite() {
     });
   };
 
+  const startRefine = async (
+    target: SelectedBlock,
+    options: { instruction?: string; strokes?: StrokesOver | null; answered?: boolean },
+    returnTo: Mode,
+  ) => {
+    refineTarget.current = {
+      id: target.id,
+      answered: options.answered ?? false,
+      strokeIds: options.strokes?.ids ?? [],
+      returnTo,
+    };
+    job.current = "refine";
+    setError(null);
+    setMode("refining");
+    await refine({
+      element: target.data.element,
+      html: target.data.html,
+      css: target.data.css,
+      width: target.width,
+      height: target.height,
+      locale: target.data.locale,
+      instruction: options.instruction,
+      png: options.strokes?.png,
+      shapes: options.strokes?.shapes,
+    });
+  };
+
+  const answer = (target: SelectedBlock, option: string, returnTo: Mode) => {
+    const question = target.data.question?.text ?? "";
+    void startRefine(
+      target,
+      { instruction: `Clarification. Question: "${question}" Answer: ${option}`, answered: true },
+      returnTo,
+    );
+  };
+
   const backToDrawing = () => {
     canvas.current?.discardResult();
-    setUnsure([]);
+    setPendingBlocks([]);
     setMode("draw");
   };
 
   const tryAgain = async () => {
     canvas.current?.discardResult();
+    setPendingBlocks([]);
     await startGeneration();
   };
 
   const accept = () => {
     canvas.current?.acceptResult();
-    setUnsure([]);
+    setPendingBlocks([]);
     setMode("draw");
   };
 
+  const beginDrawOver = (block: SelectedBlock) => {
+    const before = canvas.current?.elementIds() ?? new Set<string>();
+    setError(null);
+    setDrawOver({ blockId: block.id, label: block.data.label, before });
+    setMode("drawOver");
+  };
+
+  const newStrokeIds = (over: DrawOver) =>
+    [...(canvas.current?.elementIds() ?? [])].filter((id) => !over.before.has(id));
+
+  const applyDrawOver = async (instruction: string) => {
+    if (!drawOver) return;
+    const target = canvas.current?.getBlock(drawOver.blockId);
+    const strokes = await canvas.current?.strokesOver(drawOver.blockId, drawOver.before);
+    if (!target) return;
+    if (!strokes && !instruction) {
+      setError("nothing_drawn");
+      return;
+    }
+    setDrawOver(null);
+    await startRefine(target, { instruction, strokes }, "draw");
+  };
+
+  const cancelDrawOver = () => {
+    if (drawOver) canvas.current?.removeElements(newStrokeIds(drawOver));
+    setDrawOver(null);
+    setError(null);
+    setMode("draw");
+  };
+
+  const busy = mode === "generating" || mode === "refining";
   const stage = state.phase === "working" ? state.stage : "uploading";
+  const questions = pendingBlocks.filter((block) => block.data.question);
   const errorKey =
     error === "empty"
       ? "gen.empty"
@@ -142,18 +252,24 @@ export function NewSite() {
           <Suspense fallback={<p className="p-6 text-muted-foreground">{t("canvas.loading")}</p>}>
             <SketchCanvas
               langCode={EXCALIDRAW_LANG[i18n.language] ?? "en"}
-              locked={mode !== "draw"}
+              locked={busy || mode === "deciding"}
               onReady={(handle) => {
                 canvas.current = handle;
               }}
               onSketchCountChange={setSketchCount}
+              onSelectBlock={setSelected}
             />
           </Suspense>
         </div>
 
-        {mode === "generating" ? <GenerationLoader stage={stage} /> : null}
+        {busy ? (
+          <GenerationLoader
+            stage={stage}
+            steps={mode === "refining" ? REFINE_STEPS : GENERATION_STEPS}
+          />
+        ) : null}
 
-        {error && mode === "draw" ? (
+        {error && !busy ? (
           <div className="pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
             <p
               role="alert"
@@ -164,16 +280,24 @@ export function NewSite() {
           </div>
         ) : null}
 
-        {mode === "deciding" && unsure.length > 0 ? (
-          <div className="pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
-            <p className="rounded-full bg-card px-5 py-2.5 text-sm text-muted-foreground shadow-[var(--shadow-soft)]">
-              {t("result.unsure", { list: unsure.map((e) => e.label).join(", ") })}
-            </p>
+        {mode === "deciding" && questions.length > 0 ? (
+          <div className="absolute inset-x-0 top-4 z-40 flex justify-center px-4">
+            <div className="flex w-full max-w-2xl flex-col gap-2 rounded-[var(--radius-card)] bg-card p-3 shadow-[var(--shadow-soft)] ring-1 ring-border">
+              {questions.map((block) =>
+                block.data.question ? (
+                  <QuestionCard
+                    key={block.id}
+                    question={block.data.question}
+                    onAnswer={(option) => answer(block, option, "deciding")}
+                  />
+                ) : null,
+              )}
+            </div>
           </div>
         ) : null}
 
-        {mode === "deciding" ? (
-          <div className="absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4 [&>*]:pointer-events-auto">
+          {mode === "deciding" ? (
             <div className="flex flex-wrap items-center justify-center gap-2 rounded-full bg-card p-2 shadow-[var(--shadow-soft)] ring-1 ring-border">
               <Button variant="ghost" onClick={backToDrawing}>
                 <span aria-hidden="true">←</span> {t("result.back")}
@@ -185,8 +309,29 @@ export function NewSite() {
                 <span aria-hidden="true">✓</span> {t("result.accept")}
               </Button>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+
+          {mode === "draw" && selected ? (
+            <BlockPanel
+              key={selected.id}
+              block={selected}
+              onRefine={(instruction) => void startRefine(selected, { instruction }, "draw")}
+              onDrawOver={() => beginDrawOver(selected)}
+              onAnswer={(option) => answer(selected, option, "draw")}
+              onStep={(delta) =>
+                canvas.current?.updateBlock(selected.id, stepVersion(selected.data, delta))
+              }
+            />
+          ) : null}
+
+          {mode === "drawOver" && drawOver ? (
+            <DrawOverBar
+              label={drawOver.label}
+              onApply={(instruction) => void applyDrawOver(instruction)}
+              onCancel={cancelDrawOver}
+            />
+          ) : null}
+        </div>
       </section>
     </div>
   );

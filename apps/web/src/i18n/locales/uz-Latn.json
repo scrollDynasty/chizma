@@ -43,7 +43,8 @@
       "uploading": "Chizma yuborilmoqda…",
       "queued": "Navbatda…",
       "recognizing": "Chizma tanib olinmoqda…",
-      "building": "Sahifa yig‘ilmoqda…"
+      "building": "Sahifa yig‘ilmoqda…",
+      "refining": "Blok o‘zgartirilmoqda…"
     },
     "empty": "Hozircha yig‘adigan narsa yo‘q: elementlar tanib olinmadi.",
     "unsure": "Bu elementlarga ishonchim komil emas, tekshiring:",
@@ -58,7 +59,9 @@
       "ai_invalid_output": "SI javobidan foydalanib bo‘lmadi. Qayta urinib ko‘ring.",
       "image_too_large": "Chizma juda katta. Kichikroq qilib ko‘ring.",
       "timeout": "Yaratish juda uzoq davom etdi. Qayta urinib ko‘ring.",
-      "generic": "Nimadir xato ketdi. Qayta urinib ko‘ring."
+      "generic": "Nimadir xato ketdi. Qayta urinib ko‘ring.",
+      "nothing_to_change": "O‘zgarishni yozing yoki blok ustidan chizing.",
+      "nothing_drawn": "Avval blok ustiga biror narsa chizing."
     }
   },
   "result": {
@@ -66,5 +69,17 @@
     "again": "Yana bir bor",
     "accept": "Qabul qilish",
     "unsure": "Ishonchim komil emas: {{list}}"
+  },
+  "block": {
+    "placeholder": "Nimani o‘zgartirishni yozing…",
+    "apply": "O‘zgartirish",
+    "drawOver": "Ustidan chizish",
+    "drawHint": "«{{label}}» ustidan chizing va «Qo‘llash»ni bosing",
+    "applyDrawing": "Qo‘llash",
+    "cancel": "Bekor qilish",
+    "nothingDrawn": "Avval blok ustiga biror narsa chizing.",
+    "version": "{{total}} dan {{n}}",
+    "previous": "Oldingi versiya",
+    "next": "Keyingi versiya"
   }
 }

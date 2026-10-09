@@ -95,3 +95,8 @@ export function simplifyShapes(
   });
   return { bounds, shapes };
 }
+
+/** True when two rectangles overlap (touching edges do not count). */
+export function overlaps(a: SketchBounds, b: SketchBounds): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
