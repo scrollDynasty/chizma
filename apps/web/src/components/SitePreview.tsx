@@ -31,6 +31,7 @@ export function SitePreview({ layout, onClose }: { layout: PageLayout; onClose: 
           width: b.width,
           height: b.height,
           action: b.data.action,
+          partActions: b.data.partActions,
         })),
         {
           pageWidth: layout.width,

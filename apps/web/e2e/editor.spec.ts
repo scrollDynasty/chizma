@@ -106,6 +106,58 @@ test("a button opens a form on the site and the request reaches the owner", asyn
   await expect(page.getByRole("dialog").getByText("+998901112233")).toBeVisible();
 });
 
+test("Ctrl+click picks a link inside a block and gives it its own action", async ({
+  page,
+  context,
+}) => {
+  await context.route("https://example.com/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<p>contacts</p>" }),
+  );
+  const nav = shape("nav", "iframe", 0, 0, 1280, 80, {
+    strokeColor: "#ffffff01",
+    backgroundColor: "#ffffff01",
+    customData: {
+      chizma: {
+        elementId: "el_1",
+        kind: "nav",
+        label: "навигация",
+        html: '<nav><a href="#">Главная</a><a href="#">Услуги</a><a href="#">Контакты</a><button type="button">Связаться</button></nav>',
+        css: "nav{display:flex;align-items:center;gap:48px;height:100%;padding:0 32px;font-size:20px}",
+        locale: "ru",
+        pending: false,
+      },
+    },
+  });
+  await openEditor(page, [nav]);
+  await onCanvas(page, "api.scrollToContent(undefined, { fitToViewport: false });");
+
+  // Find the link where the block is drawn, then Ctrl+click it on the canvas.
+  const block = page.frameLocator(".excalidraw iframe");
+  const link = await block.getByText("Контакты").boundingBox();
+  if (!link) throw new Error("the block is not rendered");
+  await page.keyboard.down("Control");
+  await page.mouse.click(link.x + link.width / 2, link.y + link.height / 2);
+  await page.keyboard.up("Control");
+
+  await expect(page.getByRole("button", { name: "Контакты", pressed: true })).toBeVisible();
+  await page.getByRole("button", { name: "Действие: Контакты" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Перейти по ссылке" }).click();
+  await page
+    .getByPlaceholder("Адрес (https://…, mailto:, tel:)")
+    .fill("https://example.com/contacts");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(page.getByText("example.com/contacts")).toBeVisible();
+
+  // The other links keep no action; the site runs exactly this one.
+  await page.getByRole("button", { name: "Весь блок" }).click();
+  await expect(page.getByText("Без действия")).toBeVisible();
+  await page.getByRole("button", { name: "Открыть как сайт" }).click();
+  const site = page.frameLocator('iframe[title="Открыть как сайт"]');
+  const opened = context.waitForEvent("page");
+  await site.getByText("Контакты").click();
+  await (await opened).waitForURL("https://example.com/contacts");
+});
+
 test("the site adapts to phones automatically", async ({ page }) => {
   await openEditor(page, [
     shape("a", "rectangle", 100, 100, 300, 120),

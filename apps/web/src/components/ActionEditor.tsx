@@ -9,6 +9,7 @@ import {
   type FormSpec,
   isValidAction,
 } from "@/actions/types";
+import type { Part } from "@/canvas/parts";
 import type { SelectedBlock } from "@/canvas/SketchCanvas";
 import { ApiError, createForm, suggestAction } from "@/lib/api";
 import { Dialog, inputClass } from "./Dialog";
@@ -23,6 +24,8 @@ const PRESETS: { name: string; type: FieldType }[] = [
 
 interface Props {
   block: SelectedBlock;
+  /** A link/button inside the block, or null for the block as a whole. */
+  part?: Part | null;
   /** Other blocks that toggle/scroll actions can point at. */
   targets: SelectedBlock[];
   labelOf: (id: string) => string;
@@ -82,12 +85,15 @@ function toDraft(action: Action | null, firstTarget: string, t: (k: string) => s
   }
 }
 
-/** Pick what a block does, by hand or by describing it (the AI only fills this same form). */
-export function ActionEditor({ block, targets, labelOf, onSave, onClose }: Props) {
+/**
+ * Pick what a block (or one link/button inside it) does, by hand or by describing it; the AI
+ * only fills this same form.
+ */
+export function ActionEditor({ block, part = null, targets, labelOf, onSave, onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const [draft, setDraft] = useState<Draft>(() =>
-    toDraft(block.data.action, targets[0]?.id ?? "", t),
-  );
+  const current = part ? (block.data.partActions[part.id] ?? null) : block.data.action;
+  const name = part ? part.label : block.data.label;
+  const [draft, setDraft] = useState<Draft>(() => toDraft(current, targets[0]?.id ?? "", t));
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +141,7 @@ export function ActionEditor({ block, targets, labelOf, onSave, onClose }: Props
     setBusy(true);
     try {
       if (action?.type === "modal" && action.form && !action.form.id) {
-        const form = await createForm(action.title || block.data.label, action.form.fields);
+        const form = await createForm(action.title || name, action.form.fields);
         action.form.id = form.id;
       }
       onSave(action);
@@ -154,7 +160,7 @@ export function ActionEditor({ block, targets, labelOf, onSave, onClose }: Props
       const ref = (b: SelectedBlock) => ({ id: b.id, kind: b.data.kind, label: b.data.label });
       const result = await suggestAction({
         instruction: request.trim(),
-        block: ref(block),
+        block: part ? { id: block.id, kind: "button", label: part.label } : ref(block),
         targets: targets.map(ref),
         locale: i18n.language,
       });
@@ -171,7 +177,7 @@ export function ActionEditor({ block, targets, labelOf, onSave, onClose }: Props
   const needsTarget = draft.type === "toggle" || draft.type === "scroll";
 
   return (
-    <Dialog title={`${t("action.title")}: ${block.data.label}`} onClose={onClose}>
+    <Dialog title={`${t(part ? "action.partTitle" : "action.title")}: ${name}`} onClose={onClose}>
       <div className="flex gap-2">
         <input
           className={inputClass}

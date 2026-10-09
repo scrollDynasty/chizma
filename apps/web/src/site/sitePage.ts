@@ -1,4 +1,5 @@
 import type { Action } from "@/actions/types";
+import { annotateParts, PART_ID } from "@/canvas/parts";
 import { safeCss } from "@/preview/sandbox";
 import { RUNTIME_JS } from "./runtime";
 
@@ -22,6 +23,8 @@ export interface SiteBlock {
   width: number;
   height: number;
   action: Action | null;
+  /** Actions of links/buttons inside the block, by part id. */
+  partActions: Record<string, Action>;
 }
 
 export interface SiteOptions {
@@ -97,8 +100,8 @@ export function columnsFor(items: readonly SiteBlock[], pageWidth: number): stri
 function hiddenAtStart(blocks: readonly SiteBlock[]) {
   const hidden = new Set<string>();
   for (const block of blocks) {
-    if (block.action?.type === "toggle" && block.action.start_hidden) {
-      hidden.add(block.action.target_id);
+    for (const action of [block.action, ...Object.values(block.partActions)]) {
+      if (action?.type === "toggle" && action.start_hidden) hidden.add(action.target_id);
     }
   }
   return hidden;
@@ -112,7 +115,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1c1
 .chz-cell{position:relative;min-width:0;container-type:size;overflow:hidden}
 .chz-cell[hidden]{display:none}
 .chz-cell[data-chz-action]{cursor:pointer}
-.chz-cell[data-chz-action]:focus-visible{outline:2px solid #f59e0b;outline-offset:2px}
+.chz-cell[data-chz-action]:focus-visible,[data-chz-part]:focus-visible{outline:2px solid #f59e0b;outline-offset:2px}
 .chz-cell>svg{width:100%;height:100%;display:block}
 .chz-modal{border:0;border-radius:16px;padding:24px;max-width:min(92vw,440px);width:100%;box-shadow:0 20px 60px rgb(0 0 0/.2)}
 .chz-modal::backdrop{background:rgb(0 0 0/.35)}
@@ -134,6 +137,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1c1
 }`;
 
 const SAFE_ID = /^[\w-]{1,80}$/;
+
+/** Only well-formed part ids reach attributes and selectors. */
+const wiredParts = (block: SiteBlock) =>
+  Object.fromEntries(Object.entries(block.partActions).filter(([id]) => PART_ID.test(id)));
 
 export function buildSite(allBlocks: readonly SiteBlock[], options: SiteOptions): string {
   // Ids end up in selectors and attributes: only plain ids are accepted.
@@ -166,8 +173,15 @@ export function buildSite(allBlocks: readonly SiteBlock[], options: SiteOptions)
       const action = block.action
         ? ` data-chz-action="${escapeText(JSON.stringify(block.action))}" role="button" tabindex="0"`
         : "";
+      const parts = wiredParts(block);
+      const partAttr =
+        Object.keys(parts).length > 0
+          ? ` data-chz-parts="${escapeText(JSON.stringify(parts))}"`
+          : "";
       const hide = hidden.has(block.id) ? " hidden" : "";
-      return `<div class="chz-cell" data-el="${escapeText(block.id)}" style="${style}"${action}${hide}>${options.sanitizeHtml(block.html)}</div>`;
+      // Part ids are assigned after sanitising, exactly as in the editor, so they match.
+      const html = annotateParts(options.sanitizeHtml(block.html)).html;
+      return `<div class="chz-cell" data-el="${escapeText(block.id)}" style="${style}"${action}${partAttr}${hide}>${html}</div>`;
     });
     const template = columns.map((c) => c.replace("spacer:", "")).join(" ");
     return `<section class="chz-row" style="grid-template-columns:${template};margin-top:${marginTop}%">${cells.join("")}</section>`;
@@ -177,6 +191,11 @@ export function buildSite(allBlocks: readonly SiteBlock[], options: SiteOptions)
     .filter((b) => b.css.trim())
     .map((b) => `[data-el="${b.id}"]{${safeCss(b.css)}}`)
     .join("\n");
+  const partCss = blocks
+    .flatMap((b) =>
+      Object.keys(wiredParts(b)).map((id) => `[data-el="${b.id}"] [data-chz-part="${id}"]`),
+    )
+    .join(",");
   const submit =
     options.submit.mode === "api"
       ? `data-chz-submit="api" data-chz-api="${escapeText(options.submit.apiUrl)}"`
@@ -203,6 +222,7 @@ export function buildSite(allBlocks: readonly SiteBlock[], options: SiteOptions)
 <style>${BASE_CSS}
 .chz-page{width:100%;max-width:${options.pageWidth}px;margin:0 auto;padding-bottom:48px}
 ${blockCss}
+${partCss ? `${partCss}{cursor:pointer}` : ""}
 </style>
 </head>
 <body>

@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BlockQuestion } from "@/canvas/blocks";
+import type { Part } from "@/canvas/parts";
 import type { SelectedBlock } from "@/canvas/SketchCanvas";
 import { Button } from "./ui/button";
 
@@ -31,7 +32,11 @@ export function QuestionCard({
 
 interface BlockPanelProps {
   block: SelectedBlock;
-  /** Short description of the block's action, or null. */
+  /** Links and buttons inside the block, and the one picked (null = the whole block). */
+  parts: readonly Part[];
+  activePart: string | null;
+  onPickPart: (partId: string | null) => void;
+  /** Short description of the picked subject's action, or null. */
   actionSummary: string | null;
   onAction: () => void;
   onRefine: (instruction: string) => void;
@@ -40,9 +45,20 @@ interface BlockPanelProps {
   onStep: (delta: number) => void;
 }
 
-/** Shown when one generated block is selected: change it in words, draw over it, versions. */
+const chip = (active: boolean) =>
+  `rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+    active ? "bg-foreground text-background" : "bg-muted hover:bg-border"
+  }`;
+
+/**
+ * Shown when one generated block is selected: its action (or that of a link/button inside it),
+ * change it in words, draw over it, versions.
+ */
 export function BlockPanel({
   block,
+  parts,
+  activePart,
+  onPickPart,
   actionSummary,
   onAction,
   onRefine,
@@ -53,6 +69,7 @@ export function BlockPanel({
   const { t } = useTranslation();
   const [instruction, setInstruction] = useState("");
   const { data } = block;
+  const part = parts.find((p) => p.id === activePart) ?? null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -64,11 +81,40 @@ export function BlockPanel({
   return (
     <div className={`${panel} w-full max-w-2xl`}>
       {data.question ? <QuestionCard question={data.question} onAnswer={onAnswer} /> : null}
-      <div className="flex flex-wrap items-center gap-2">
+      {parts.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5" title={t("block.partHint")}>
+          <span className="text-xs text-muted-foreground">{t("block.parts")}</span>
+          <button
+            type="button"
+            className={chip(part === null)}
+            aria-pressed={part === null}
+            onClick={() => onPickPart(null)}
+          >
+            {t("block.wholeBlock")}
+          </button>
+          {parts.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={chip(p.id === part?.id)}
+              aria-pressed={p.id === part?.id}
+              onClick={() => onPickPart(p.id)}
+            >
+              {p.label}
+              {data.partActions[p.id] ? (
+                <span aria-hidden="true" className="ml-1 text-accent">
+                  ●
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="flex min-w-0 items-center gap-2">
         <Button variant="outline" onClick={onAction}>
-          {t("action.button")}
+          {part ? `${t("action.button")}: ${part.label}` : t("action.button")}
         </Button>
-        <span className="truncate text-sm text-muted-foreground">
+        <span className="min-w-0 truncate text-sm text-muted-foreground">
           {actionSummary ?? t("action.none")}
         </span>
       </div>
@@ -79,7 +125,7 @@ export function BlockPanel({
           onChange={(event) => setInstruction(event.target.value)}
           placeholder={t("block.placeholder")}
           maxLength={500}
-          className="h-10 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-accent"
+          className="h-10 min-w-0 flex-1 basis-56 rounded-full border border-border bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-accent"
         />
         <Button type="submit" disabled={!instruction.trim()}>
           {t("block.apply")}

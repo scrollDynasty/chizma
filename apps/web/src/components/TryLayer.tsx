@@ -1,7 +1,10 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type Action, isSafeUrl } from "@/actions/types";
-import type { CanvasHandle } from "@/canvas/SketchCanvas";
+import { actionsOf } from "@/canvas/blocks";
+import { cachedPartRects, partRects } from "@/canvas/partProbe";
+import { hitPart, type PartRect } from "@/canvas/parts";
+import type { BlockPoint, CanvasHandle } from "@/canvas/SketchCanvas";
 import { submitForm } from "@/lib/api";
 import { Dialog, inputClass } from "./Dialog";
 import { Button } from "./ui/button";
@@ -10,8 +13,8 @@ type ModalAction = Extract<Action, { type: "modal" }>;
 
 /**
  * "Try" mode: the canvas is frozen and this transparent layer catches clicks, finds the block
- * under the pointer and runs its action with the editor's own, audited code. Generated block
- * code never runs here.
+ * (and the link/button inside it) under the pointer and runs its action with the editor's own,
+ * audited code. Generated block code never runs here.
  */
 export function TryLayer({ canvas }: { canvas: CanvasHandle }) {
   const { t } = useTranslation();
@@ -23,10 +26,11 @@ export function TryLayer({ canvas }: { canvas: CanvasHandle }) {
   useEffect(() => {
     const touched = hidden.current;
     for (const block of canvas.allBlocks()) {
-      const action = block.data.action;
-      if (action?.type === "toggle" && action.start_hidden && !touched.has(action.target_id)) {
-        touched.add(action.target_id);
-        canvas.setVisible(action.target_id, false);
+      for (const action of actionsOf(block.data)) {
+        if (action.type === "toggle" && action.start_hidden && !touched.has(action.target_id)) {
+          touched.add(action.target_id);
+          canvas.setVisible(action.target_id, false);
+        }
       }
     }
     return () => {
@@ -64,17 +68,30 @@ export function TryLayer({ canvas }: { canvas: CanvasHandle }) {
         aria-label={t("try.hint")}
         className="absolute inset-0 z-30 bg-transparent"
         style={{ cursor: hovering ? "pointer" : "default" }}
-        onPointerMove={(e) =>
-          setHovering(Boolean(canvas.blockAt(e.clientX, e.clientY)?.data.action))
-        }
-        onClick={(e) => {
-          const action = canvas.blockAt(e.clientX, e.clientY)?.data.action;
+        onPointerMove={(e) => {
+          const hit = canvas.pointAt(e.clientX, e.clientY);
+          if (!hit) return setHovering(false);
+          const { data, width, height } = hit.block;
+          setHovering(Boolean(actionAt(hit, cachedPartRects(data, width, height) ?? [])));
+        }}
+        onClick={async (e) => {
+          const hit = canvas.pointAt(e.clientX, e.clientY);
+          if (!hit) return;
+          const { data, width, height } = hit.block;
+          const action = actionAt(hit, await partRects(data, width, height));
           if (action) run(action);
         }}
       />
       {modal ? <TryModal action={modal} onClose={() => setModal(null)} /> : null}
     </>
   );
+}
+
+/** The clicked link/button's own action, else the block's. */
+function actionAt(hit: BlockPoint, rects: readonly PartRect[]): Action | null {
+  const { data } = hit.block;
+  const part = hitPart(rects, hit.x, hit.y, 0);
+  return (part ? data.partActions[part] : undefined) ?? data.action;
 }
 
 function TryModal({ action, onClose }: { action: ModalAction; onClose: () => void }) {

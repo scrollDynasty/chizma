@@ -1,5 +1,6 @@
 import { type Action, parseAction } from "@/actions/types";
 import type { Block, SceneElement, SceneGraph } from "@/lib/scene";
+import { blockParts, PART_ID, remapPartActions } from "./parts";
 
 /**
  * Generated blocks live on the Excalidraw canvas as "iframe" elements, so people can move,
@@ -33,6 +34,8 @@ export interface BlockData {
   question: BlockQuestion | null;
   /** What happens when a visitor clicks the block (from the safe action registry). */
   action: Action | null;
+  /** Actions of single links/buttons inside the block, by part id (see parts.ts). */
+  partActions: Record<string, Action>;
 }
 
 /** Saved on a sketch shape while it is hidden behind a pending result. */
@@ -74,7 +77,19 @@ export function blockDataOf(element: WithCustomData): BlockData | null {
     current,
     question: data.question ?? null,
     action: parseAction(data.action),
+    partActions: parsePartActions(data.partActions),
   };
+}
+
+/** Saved data is untrusted: only known part ids with valid actions are kept. */
+function parsePartActions(raw: unknown): Record<string, Action> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: Record<string, Action> = {};
+  for (const [id, value] of Object.entries(raw)) {
+    const action = PART_ID.test(id) ? parseAction(value) : null;
+    if (action) result[id] = action;
+  }
+  return result;
 }
 
 function legacyElement(id: string, kind: string, label: string): SceneElement {
@@ -95,6 +110,12 @@ function legacyElement(id: string, kind: string, label: string): SceneElement {
 
 export const isBlock = (element: WithCustomData) => blockDataOf(element) !== null;
 
+/** The block's own action and those of its parts. */
+export const actionsOf = (data: Pick<BlockData, "action" | "partActions">): Action[] => [
+  ...(data.action ? [data.action] : []),
+  ...Object.values(data.partActions),
+];
+
 export function blockData(
   element: SceneElement,
   block: Block,
@@ -114,6 +135,7 @@ export function blockData(
     current: 0,
     question,
     action: null,
+    partActions: {},
   };
 }
 
@@ -130,6 +152,7 @@ export function withNewVersion(data: BlockData, block: Block, answered = false):
     versions,
     current: versions.length - 1,
     question: answered ? null : data.question,
+    partActions: movePartActions(data, block.html),
   };
 }
 
@@ -137,5 +160,17 @@ export function withNewVersion(data: BlockData, block: Block, answered = false):
 export function stepVersion(data: BlockData, delta: number): BlockData {
   const current = Math.min(Math.max(data.current + delta, 0), data.versions.length - 1);
   const version = data.versions[current] ?? { html: data.html, css: data.css };
-  return { ...data, current, html: version.html, css: version.css };
+  return {
+    ...data,
+    current,
+    html: version.html,
+    css: version.css,
+    partActions: movePartActions(data, version.html),
+  };
+}
+
+/** Part ids follow the markup, so actions move to the matching parts of the new html. */
+function movePartActions(data: BlockData, html: string): Record<string, Action> {
+  if (html === data.html || Object.keys(data.partActions).length === 0) return data.partActions;
+  return remapPartActions(blockParts(data.html), data.partActions, blockParts(html));
 }

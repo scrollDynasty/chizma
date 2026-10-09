@@ -80,7 +80,10 @@
     "nothingDrawn": "Draw something over the block first.",
     "version": "{{n}} of {{total}}",
     "previous": "Previous version",
-    "next": "Next version"
+    "next": "Next version",
+    "parts": "Buttons and links:",
+    "wholeBlock": "Whole block",
+    "partHint": "Ctrl+click a button on the canvas to pick it"
   },
   "crash": {
     "title": "Something went wrong",
@@ -127,7 +130,8 @@
     "defaults": {
       "submit": "Send",
       "success": "Thank you! We will contact you soon."
-    }
+    },
+    "partTitle": "What it does"
   },
   "try": {
     "start": "Try it",
