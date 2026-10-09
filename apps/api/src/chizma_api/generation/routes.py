@@ -146,6 +146,10 @@ async def start_generation(
     db.commit()
 
     job = jobs.create(user.id)
+    log.info(
+        "generation %s started by user %s: %d shapes, %d KB image, provider %s",
+        job.id, user.id, len(parsed_shapes), len(png) // 1024, _provider(request).name,
+    )  # fmt: skip
     sketch = SketchInput(png, parsed_shapes, width, height, locale)
     background.add_task(_run_job, request, job, sketch)
     return StartOut(id=job.id, status=job.status)
