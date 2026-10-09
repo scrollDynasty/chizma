@@ -18,6 +18,7 @@ import { buildBlockDocument } from "@/preview/blockDocument";
 import { sanitizeBlockHtml, withCsp } from "@/preview/sandbox";
 import { type BlockData, blockDataOf, isBlock } from "./blocks";
 import { type Draft, loadDraft, saveDraft } from "./draft";
+import { fitToPage, isPage, newPage } from "./page";
 import {
   acceptResult,
   discardResult,
@@ -85,6 +86,14 @@ export interface CanvasHandle {
   setVisible: (id: string, visible: boolean) => void;
   /** Bring a block into view (scroll action). */
   scrollTo: (id: string) => void;
+  /** The page and the blocks on it, positioned relative to the page (for "Open as site"). */
+  pageLayout: () => PageLayout | null;
+}
+
+export interface PageLayout {
+  width: number;
+  height: number;
+  blocks: (SelectedBlock & { x: number; y: number })[];
 }
 
 interface Props {
@@ -111,7 +120,14 @@ const update: Update = (element, patch) =>
 /** Sanitised (DOMPurify) and CSP-locked document for one block. */
 const renderBlock = (data: BlockData) => withCsp(buildBlockDocument(data, sanitizeBlockHtml));
 
-const isSketch = (element: ExcalidrawElement) => !element.isDeleted && !isBlock(element);
+const isSketch = (element: ExcalidrawElement) =>
+  !element.isDeleted && !isBlock(element) && !isPage(element);
+
+/** Every drawing starts on a site page; older drafts get one. */
+const withPage = (elements: readonly SceneItem[]) =>
+  elements.some((e) => isPage(e) && !e.isDeleted)
+    ? [...elements]
+    : [newPage() as unknown as SceneItem, ...elements];
 
 export default function SketchCanvas({
   langCode,
@@ -123,13 +139,14 @@ export default function SketchCanvas({
   const [initial, setInitial] = useState<Draft | null | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const lastSelection = useRef("");
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
 
   useEffect(() => {
     void loadDraft().then((draft) => {
-      if (!draft) return setInitial(null);
+      if (!draft) return setInitial({ elements: withPage([]), files: {}, savedAt: Date.now() });
       // A result left undecided (tab closed) goes back to the drawing.
       const elements = discardResult(draft.elements as SceneItem[], (e, p) => ({ ...e, ...p }));
-      setInitial({ ...draft, elements: elements.filter((e) => !e.isDeleted) });
+      setInitial({ ...draft, elements: withPage(elements.filter((e) => !e.isDeleted)) });
     });
     return () => window.clearTimeout(saveTimer.current);
   }, []);
@@ -142,7 +159,9 @@ export default function SketchCanvas({
   });
 
   const attach = (api: ExcalidrawImperativeAPI) => {
+    apiRef.current = api;
     const current = () => api.getSceneElementsIncludingDeleted() as unknown as SceneItem[];
+    const page = () => api.getSceneElements().find((e) => isPage(e));
     if (import.meta.env.DEV) {
       // Lets local end-to-end checks add strokes programmatically. Never in production builds.
       (window as unknown as { __chizmaCanvas?: ExcalidrawImperativeAPI }).__chizmaCanvas = api;
@@ -150,14 +169,10 @@ export default function SketchCanvas({
     onReady({
       snapshot: async () => {
         const sketch = api.getSceneElements().filter(isSketch);
-        // The visible canvas is the page frame: the result lands exactly where you drew.
-        const view = api.getAppState();
-        const frame = {
-          x: -view.scrollX,
-          y: -view.scrollY,
-          width: view.width / view.zoom.value,
-          height: view.height / view.zoom.value,
-        };
+        // The site page is the frame: results land exactly where they were drawn on it.
+        const sheet = page();
+        if (!sheet) return null;
+        const frame = { x: sheet.x, y: sheet.y, width: sheet.width, height: sheet.height };
         const { bounds, shapes } = simplifyShapes(sketch, frame);
         if (!bounds || shapes.length === 0) return null;
         const png = await exportToBlob({
@@ -261,6 +276,25 @@ export default function SketchCanvas({
         );
         api.updateScene(replaceScene(elements, false));
       },
+      pageLayout: () => {
+        const sheet = page();
+        if (!sheet) return null;
+        const blocks = api.getSceneElements().flatMap((element) => {
+          const data = blockDataOf(element);
+          if (!data || element.opacity === 0) return [];
+          return [
+            {
+              id: element.id,
+              data,
+              width: element.width,
+              height: element.height,
+              x: element.x - sheet.x,
+              y: element.y - sheet.y,
+            },
+          ];
+        });
+        return { width: sheet.width, height: sheet.height, blocks };
+      },
       scrollTo: (id) => {
         const element = api.getSceneElements().find((e) => e.id === id);
         if (element) api.scrollToContent(element, { animate: true, fitToViewport: false });
@@ -287,6 +321,27 @@ export default function SketchCanvas({
     files: BinaryFiles,
   ) => {
     onSketchCountChange(visibleElements(elements).filter(isSketch).length);
+    // Keep everything on the page once the person lets go (never mid-gesture).
+    const idle =
+      !appState.newElement &&
+      !appState.isResizing &&
+      !appState.isRotating &&
+      !appState.selectedElementsAreBeingDragged &&
+      !appState.multiElement &&
+      appState.cursorButton === "up";
+    const api = apiRef.current;
+    if (idle && api) {
+      const patches = fitToPage(elements);
+      if (patches.size > 0) {
+        api.updateScene({
+          elements: api.getSceneElementsIncludingDeleted().map((element) => {
+            const patch = patches.get(element.id);
+            return patch ? newElementWith(element, patch) : element;
+          }),
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+      }
+    }
     const selected = Object.keys(appState.selectedElementIds).filter(
       (id) => appState.selectedElementIds[id],
     );
@@ -313,7 +368,7 @@ export default function SketchCanvas({
       initialData={{
         elements: (initial?.elements ?? []) as NonDeletedExcalidrawElement[],
         files: (initial?.files ?? {}) as BinaryFiles,
-        appState: { viewBackgroundColor: "#ffffff" },
+        appState: { viewBackgroundColor: "#f1f0ee" },
         scrollToContent: true,
       }}
       onChange={handleChange}

@@ -143,5 +143,12 @@
     "empty": "Hozircha formalar yo‘q. Blokka forma bilan oyna biriktiring.",
     "none": "Hozircha arizalar yo‘q.",
     "count": "Arizalar: {{count}}"
+  },
+  "site": {
+    "open": "Sayt sifatida ochish",
+    "back": "Muharrirga qaytish",
+    "desktop": "Kompyuter",
+    "phone": "Telefon",
+    "empty": "Varaqda hali bloklar yo‘q: avval biror narsa yarating."
   }
 }

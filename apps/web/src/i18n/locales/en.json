@@ -143,5 +143,12 @@
     "empty": "No forms yet. Add a window with a form to a block.",
     "none": "No requests yet.",
     "count": "{{count}} requests"
+  },
+  "site": {
+    "open": "Open as site",
+    "back": "Back to editor",
+    "desktop": "Desktop",
+    "phone": "Phone",
+    "empty": "No blocks on the page yet: generate something first."
   }
 }
