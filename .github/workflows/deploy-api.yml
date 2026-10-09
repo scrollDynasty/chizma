@@ -1,0 +1,52 @@
+name: Deploy API to Azure App Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC login to Azure, no stored passwords
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Skipped until infra/azure/setup.sh has configured the repository variables.
+    if: vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: azure-api
+      url: ${{ vars.CHIZMA_API_URL }}
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Export pinned requirements for the App Service build
+        run: uv export --frozen --no-dev --no-editable --no-hashes --format requirements-txt -o requirements.txt
+      - name: Package
+        run: zip -r "$RUNNER_TEMP/api.zip" src migrations alembic.ini pyproject.toml uv.lock requirements.txt startup.sh -x "**/__pycache__/*"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: ${{ runner.temp }}/api.zip
+      - name: Smoke test
+        run: |
+          for _ in $(seq 1 20); do
+            if curl -fsS "${{ vars.CHIZMA_API_URL }}/health"; then exit 0; fi
+            sleep 15
+          done
+          echo "API did not become healthy" && exit 1
