@@ -1,5 +1,5 @@
 # Build context: repository root (the web app is part of a pnpm workspace).
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 RUN corepack enable
 WORKDIR /repo
 
