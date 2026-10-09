@@ -81,5 +81,10 @@
     "version": "{{n}} of {{total}}",
     "previous": "Previous version",
     "next": "Next version"
+  },
+  "crash": {
+    "title": "Something went wrong",
+    "body": "Your drawing is saved in this browser. Reload the page to continue.",
+    "reload": "Reload"
   }
 }

@@ -81,5 +81,10 @@
     "version": "{{total}} dan {{n}}",
     "previous": "Oldingi versiya",
     "next": "Keyingi versiya"
+  },
+  "crash": {
+    "title": "Nimadir xato ketdi",
+    "body": "Chizmangiz shu brauzerda saqlangan. Davom etish uchun sahifani qayta yuklang.",
+    "reload": "Qayta yuklash"
   }
 }

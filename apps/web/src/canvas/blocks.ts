@@ -39,9 +39,54 @@ interface WithCustomData {
   customData?: Record<string, unknown>;
 }
 
+/**
+ * Reads a block's data, filling fields added later (versions, element, question) so blocks
+ * saved by an older editor keep working instead of crashing the page.
+ */
 export function blockDataOf(element: WithCustomData): BlockData | null {
-  const data = element.customData?.chizma;
-  return data && typeof data === "object" ? (data as BlockData) : null;
+  const raw = element.customData?.chizma;
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Partial<BlockData>;
+  const html = typeof data.html === "string" ? data.html : "";
+  const css = typeof data.css === "string" ? data.css : "";
+  const elementId = typeof data.elementId === "string" ? data.elementId : "el_1";
+  const kind = typeof data.kind === "string" ? data.kind : "box";
+  const label = typeof data.label === "string" ? data.label : kind;
+  const versions =
+    Array.isArray(data.versions) && data.versions.length > 0 ? data.versions : [{ html, css }];
+  const current =
+    typeof data.current === "number"
+      ? Math.min(Math.max(data.current, 0), versions.length - 1)
+      : versions.length - 1;
+  return {
+    elementId,
+    kind,
+    label,
+    html,
+    css,
+    locale: typeof data.locale === "string" ? data.locale : "ru",
+    pending: data.pending === true,
+    element: data.element ?? legacyElement(elementId, kind, label),
+    versions,
+    current,
+    question: data.question ?? null,
+  };
+}
+
+function legacyElement(id: string, kind: string, label: string): SceneElement {
+  return {
+    id,
+    kind,
+    label,
+    intent: label,
+    bbox: { x: 0, y: 0, w: 1, h: 1 },
+    confidence: 1,
+    parent_id: null,
+    source_shape_ids: [],
+    text: null,
+    style_hints: { colors: [], shape: "", notes: "" },
+    alternatives: [],
+  };
 }
 
 export const isBlock = (element: WithCustomData) => blockDataOf(element) !== null;
