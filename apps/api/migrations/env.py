@@ -4,6 +4,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
+import chizma_api.models  # noqa: F401  (registers tables on Base.metadata)
 from chizma_api.config import get_settings
 from chizma_api.db import Base, create_db_engine
 

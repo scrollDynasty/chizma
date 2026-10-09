@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev:web": "pnpm --filter @chizma/web dev",
-    "dev:api": "cd apps/api && uv run fastapi dev src/chizma_api/main.py",
+    "dev:api": "cd apps/api && uv run alembic upgrade head && uv run fastapi dev src/chizma_api/main.py",
     "build": "pnpm -r build",
     "lint": "biome check .",
     "format": "biome check --write .",
