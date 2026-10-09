@@ -8,10 +8,13 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from chizma_api import __version__
+from chizma_api.actions.routes import router as actions_router
 from chizma_api.auth.providers import AuthlibGateway, OAuthGateway
 from chizma_api.auth.routes import router as auth_router
 from chizma_api.config import Settings, get_settings
 from chizma_api.db import create_db_engine, create_session_factory
+from chizma_api.forms.routes import SubmitLimiter
+from chizma_api.forms.routes import router as forms_router
 from chizma_api.generation.jobs import JobStore
 from chizma_api.generation.limits import RateLimiter
 from chizma_api.generation.providers import AIProvider, make_provider
@@ -48,6 +51,7 @@ def create_app(
     app.state.ai_provider = ai_provider or make_provider(settings)
     app.state.jobs = JobStore()
     app.state.rate_limiter = RateLimiter(settings.min_seconds_between_generations)
+    app.state.submit_limiter = SubmitLimiter(per_minute=5)
 
     app.add_middleware(
         CORSMiddleware,
@@ -67,6 +71,8 @@ def create_app(
 
     app.include_router(auth_router)
     app.include_router(generation_router)
+    app.include_router(actions_router)
+    app.include_router(forms_router)
 
     @app.get("/health")
     def health() -> Health:

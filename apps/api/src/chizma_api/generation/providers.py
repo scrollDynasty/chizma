@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from chizma_api.actions.schemas import SUGGESTION_JSON_SCHEMA
 from chizma_api.config import Settings
 from chizma_api.generation import prompts
 from chizma_api.generation.schemas import (
@@ -42,6 +43,16 @@ class RefineInput:
     shapes: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class SuggestInput:
+    """Pick and configure an action for a block from a request in words."""
+
+    instruction: str
+    block: dict[str, str]
+    targets: list[dict[str, str]]
+    locale: str
+
+
 @dataclass
 class Usage:
     input_tokens: int = 0
@@ -76,6 +87,8 @@ class AIProvider(Protocol):
     ) -> ModelReply: ...
 
     async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply: ...
+
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply: ...
 
 
 def refine_context(refine: RefineInput, feedback: str | None) -> str:
@@ -204,6 +217,19 @@ class OpenAIProvider:
             )
         return await self._call(prompts.REFINE_BLOCK, content, "blocks", BLOCKS_JSON_SCHEMA, 8_000)
 
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply:
+        context = {
+            "locale": suggest.locale,
+            "request": suggest.instruction,
+            "block": suggest.block,
+            "targets": suggest.targets,
+        }
+        text = _with_feedback(json.dumps(context, ensure_ascii=False), feedback)
+        content = [{"type": "input_text", "text": text}]
+        return await self._call(
+            prompts.SUGGEST_ACTION, content, "action", SUGGESTION_JSON_SCHEMA, 2_000
+        )
+
 
 class UnavailableProvider:
     """Used when the configured provider cannot start (e.g. missing key): the API stays up
@@ -222,6 +248,9 @@ class UnavailableProvider:
         raise AIProviderError(self._reason)
 
     async def refine_block(self, refine: RefineInput, feedback: str | None) -> ModelReply:
+        raise AIProviderError(self._reason)
+
+    async def suggest_action(self, suggest: SuggestInput, feedback: str | None) -> ModelReply:
         raise AIProviderError(self._reason)
 
 
