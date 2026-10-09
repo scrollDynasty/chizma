@@ -20,6 +20,7 @@ const block = (
   width,
   height,
   action: null,
+  partActions: {},
   ...extra,
 });
 
@@ -97,5 +98,34 @@ describe("buildSite", () => {
     const row = buildSite([left, mid, right], options);
 
     expect(row).toMatch(/data-el="right" style="grid-column:6;/);
+  });
+});
+
+describe("part actions", () => {
+  const nav = block("nav", "nav", 0, 0, 1280, 80, {
+    html: '<nav><a href="#">Home</a><button type="button">Call</button></nav>',
+    partActions: {
+      p2: { type: "link", url: "tel:+998901234567", new_tab: false },
+      'x"]{}': { type: "scroll", target_id: "nav" },
+    },
+  });
+  const page = buildSite([nav], options);
+
+  it("marks the parts and puts only well-formed part actions on the cell", () => {
+    expect(page).toContain('<a href="#" data-chz-part="p1">Home</a>');
+    expect(page).toContain('data-chz-part="p2"');
+    expect(page).toContain("data-chz-parts=");
+    expect(page).toContain("tel:+998901234567");
+    expect(page).not.toContain("target_id&quot;:&quot;nav");
+    expect(page).toContain('[data-el="nav"] [data-chz-part="p2"]{cursor:pointer}');
+  });
+
+  it("hides the targets of part toggles that start hidden", () => {
+    const menu = block("menu", "list", 0, 100, 300, 200);
+    const burger = block("burger", "nav", 0, 0, 1280, 80, {
+      html: "<button>Menu</button>",
+      partActions: { p1: { type: "toggle", target_id: "menu", start_hidden: true } },
+    });
+    expect(buildSite([burger, menu], options)).toMatch(/data-el="menu"[^>]* hidden>/);
   });
 });

@@ -86,4 +86,6 @@ A block can do one thing from a fixed, audited registry (`apps/api/src/chizma_ap
 | `toggle` | `target_id` (another block), `start_hidden` |
 | `scroll` | `target_id` (another block) |
 
+**Parts.** Each link and button inside a block (`a`, `button`, `[role=button]`, submit/button inputs) can have its own action, picked with Ctrl/Cmd+click on the canvas or from the block panel. Part ids (`p1`, `p2`, ... in document order) are assigned by our code after sanitising (`apps/web/src/canvas/parts.ts`); model output cannot set them. Part actions are stored as `partActions` on the block, follow their part by text when the block is regenerated, and live on the site cell as `data-chz-parts`; the runtime uses the clicked part's action, else the block's. The editor measures where parts sit in an off-screen copy of the block sandboxed without `allow-scripts`.
+
 `POST /v1/actions/suggest` lets the model pick and configure one action from words; it never writes code. **Try** mode in the editor runs actions with the editor's own code (generated code never runs). Forms: `POST /v1/forms` (owner) registers a form; `POST /v1/forms/{id}/submissions` is public (required fields, honeypot `_hp`, 5 per minute per client); `GET /v1/forms` and `GET /v1/forms/{id}/submissions` show requests to the owner.

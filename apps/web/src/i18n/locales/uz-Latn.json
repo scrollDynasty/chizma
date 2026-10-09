@@ -80,7 +80,10 @@
     "nothingDrawn": "Avval blok ustiga biror narsa chizing.",
     "version": "{{total}} dan {{n}}",
     "previous": "Oldingi versiya",
-    "next": "Keyingi versiya"
+    "next": "Keyingi versiya",
+    "parts": "Tugma va havolalar:",
+    "wholeBlock": "Butun blok",
+    "partHint": "Kanvasdagi tugmani Ctrl+bosish bilan tanlang"
   },
   "crash": {
     "title": "Nimadir xato ketdi",
@@ -127,7 +130,8 @@
     "defaults": {
       "submit": "Yuborish",
       "success": "Rahmat! Tez orada siz bilan bog‘lanamiz."
-    }
+    },
+    "partTitle": "Nima qiladi"
   },
   "try": {
     "start": "Sinab ko‘rish",

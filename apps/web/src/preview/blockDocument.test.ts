@@ -21,4 +21,15 @@ describe("buildBlockDocument", () => {
     expect(doc).toContain("<title>дом &lt;1&gt;</title>");
     expect(doc).toContain('<html lang="ru">');
   });
+
+  it("outlines wired and selected parts, ignoring unsafe ids", () => {
+    const marked = buildBlockDocument(
+      { html: "", css: "", locale: "ru", label: "nav" },
+      (html) => html,
+      { wired: ["p1", "p2", "x}body{"], selected: "p2" },
+    );
+    expect(marked).toContain('[data-chz-part="p1"]{outline:2px dashed');
+    expect(marked).toContain('[data-chz-part="p2"]{outline:3px solid');
+    expect(marked).not.toContain("x}body{");
+  });
 });

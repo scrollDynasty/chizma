@@ -15,10 +15,11 @@ import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw
 import { useEffect, useRef, useState } from "react";
 import type { GenerationJob } from "@/lib/scene";
 import { buildBlockDocument } from "@/preview/blockDocument";
-import { sanitizeBlockHtml, withCsp } from "@/preview/sandbox";
+import { withCsp } from "@/preview/sandbox";
 import { type BlockData, blockDataOf, HIDDEN_OPACITY_KEY, isBlock } from "./blocks";
 import { type Draft, loadDraft, saveDraft } from "./draft";
 import { fitToPage, isPage, newPage } from "./page";
+import { markedBlockHtml } from "./parts";
 import {
   acceptResult,
   discardResult,
@@ -82,12 +83,22 @@ export interface CanvasHandle {
   allBlocks: () => SelectedBlock[];
   /** The topmost block under a point on the screen (client coordinates). */
   blockAt: (clientX: number, clientY: number) => SelectedBlock | null;
+  /** That block and the point inside it, in block units (rotation undone). */
+  pointAt: (clientX: number, clientY: number) => BlockPoint | null;
+  /** Outline one part of a block on the canvas (editor only, not saved), or clear it. */
+  markPart: (blockId: string | null, partId: string | null) => void;
   /** Show or hide a block for "Try" mode only: not saved in history. */
   setVisible: (id: string, visible: boolean) => void;
   /** Bring a block into view (scroll action). */
   scrollTo: (id: string) => void;
   /** The page and the blocks on it, positioned relative to the page (for "Open as site"). */
   pageLayout: () => PageLayout | null;
+}
+
+export interface BlockPoint {
+  block: SelectedBlock;
+  x: number;
+  y: number;
 }
 
 export interface PageLayout {
@@ -107,6 +118,8 @@ interface Props {
   onSelectBlock: (block: SelectedBlock | null) => void;
   /** False while the scene shows a temporary state (Try mode) that must not be saved. */
   persist?: boolean;
+  /** Every press on the canvas (before Excalidraw handles it), with Ctrl/Cmd held or not. */
+  onCanvasPointerDown?: (clientX: number, clientY: number, withModifier: boolean) => void;
 }
 
 /** Longest side sent to the vision model; larger images are downscaled anyway. */
@@ -119,8 +132,24 @@ const update: Update = (element, patch) =>
     patch as never,
   ) as unknown as typeof element;
 
-/** Sanitised (DOMPurify) and CSP-locked document for one block. */
-const renderBlock = (data: BlockData) => withCsp(buildBlockDocument(data, sanitizeBlockHtml));
+/**
+ * Sanitised (DOMPurify), part-marked and CSP-locked document for one block. Parts with an
+ * action get a dashed outline, the part being edited a solid one.
+ */
+const renderBlock = (data: BlockData, selectedPart: string | null = null) =>
+  withCsp(
+    buildBlockDocument(data, (html) => markedBlockHtml(html).html, {
+      wired: Object.keys(data.partActions),
+      selected: selectedPart,
+    }),
+  );
+
+const asSelected = (element: ExcalidrawElement, data: BlockData): SelectedBlock => ({
+  id: element.id,
+  data,
+  width: element.width,
+  height: element.height,
+});
 
 /** Strokes still to be generated: not blocks, not the page, not strokes hidden behind a result. */
 const isSketch = (element: ExcalidrawElement) =>
@@ -163,6 +192,7 @@ export default function SketchCanvas({
   onSketchCountChange,
   onSelectBlock,
   persist = true,
+  onCanvasPointerDown,
 }: Props) {
   const [initial, setInitial] = useState<Draft | null | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -170,6 +200,7 @@ export default function SketchCanvas({
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const persistRef = useRef(persist);
   persistRef.current = persist;
+  const marked = useRef<{ blockId: string; partId: string } | null>(null);
 
   useEffect(() => {
     void loadDraft().then((draft) => {
@@ -195,6 +226,40 @@ export default function SketchCanvas({
     apiRef.current = api;
     const current = () => api.getSceneElementsIncludingDeleted() as unknown as SceneItem[];
     const page = () => api.getSceneElements().find((e) => isPage(e));
+    const markOf = (id: string) => (marked.current?.blockId === id ? marked.current.partId : null);
+    const rerender = (ids: readonly string[]) => {
+      const elements = current().map((element) => {
+        const data = ids.includes(element.id) ? blockDataOf(element) : null;
+        if (!data) return element;
+        return update(element, {
+          customData: {
+            ...element.customData,
+            generationData: { status: "done", html: renderBlock(data, markOf(element.id)) },
+          },
+        });
+      });
+      api.updateScene(replaceScene(elements, false));
+    };
+    const pointAt = (clientX: number, clientY: number): BlockPoint | null => {
+      const point = viewportCoordsToSceneCoords({ clientX, clientY }, api.getAppState());
+      for (const element of [...api.getSceneElements()].reverse()) {
+        const data = blockDataOf(element);
+        if (!data || element.opacity === 0) continue;
+        // Undo the block's rotation around its centre, then measure from its corner.
+        const cx = element.x + element.width / 2;
+        const cy = element.y + element.height / 2;
+        const cos = Math.cos(-element.angle);
+        const sin = Math.sin(-element.angle);
+        const dx = point.x - cx;
+        const dy = point.y - cy;
+        const x = dx * cos - dy * sin + element.width / 2;
+        const y = dx * sin + dy * cos + element.height / 2;
+        if (x >= 0 && x <= element.width && y >= 0 && y <= element.height) {
+          return { block: asSelected(element, data), x, y };
+        }
+      }
+      return null;
+    };
     if (import.meta.env.DEV) {
       // Lets local end-to-end checks add strokes programmatically. Never in production builds.
       (window as unknown as { __chizmaCanvas?: ExcalidrawImperativeAPI }).__chizmaCanvas = api;
@@ -253,7 +318,7 @@ export default function SketchCanvas({
                 customData: {
                   ...element.customData,
                   chizma: data,
-                  generationData: { status: "done", html: renderBlock(data) },
+                  generationData: { status: "done", html: renderBlock(data, markOf(id)) },
                 },
               })
             : element,
@@ -289,19 +354,12 @@ export default function SketchCanvas({
             ? [{ id: element.id, data, width: element.width, height: element.height }]
             : [];
         }),
-      blockAt: (clientX, clientY) => {
-        const point = viewportCoordsToSceneCoords({ clientX, clientY }, api.getAppState());
-        const hit = [...api.getSceneElements()].reverse().find((element) => {
-          if (!isBlock(element) || element.opacity === 0) return false;
-          return (
-            point.x >= element.x &&
-            point.x <= element.x + element.width &&
-            point.y >= element.y &&
-            point.y <= element.y + element.height
-          );
-        });
-        const data = hit ? blockDataOf(hit) : null;
-        return hit && data ? { id: hit.id, data, width: hit.width, height: hit.height } : null;
+      blockAt: (clientX, clientY) => pointAt(clientX, clientY)?.block ?? null,
+      pointAt,
+      markPart: (blockId, partId) => {
+        const before = marked.current?.blockId;
+        marked.current = blockId && partId ? { blockId, partId } : null;
+        rerender([before, blockId].filter((id): id is string => Boolean(id)));
       },
       setVisible: (id, visible) => {
         // Remember the real opacity so it comes back exactly (and survives a reload).
@@ -409,29 +467,39 @@ export default function SketchCanvas({
   };
 
   return (
-    <Excalidraw
-      excalidrawAPI={attach}
-      initialData={{
-        elements: (initial?.elements ?? []) as NonDeletedExcalidrawElement[],
-        files: (initial?.files ?? {}) as BinaryFiles,
-        appState: { viewBackgroundColor: "#f1f0ee" },
-        scrollToContent: true,
+    // Capture phase: we see the press (and Ctrl/Cmd) before Excalidraw acts on it.
+    <div
+      className="h-full w-full"
+      onPointerDownCapture={(event) => {
+        // Only presses on the drawing itself, not on toolbars and menus.
+        if (event.button !== 0 || !(event.target instanceof HTMLCanvasElement)) return;
+        onCanvasPointerDown?.(event.clientX, event.clientY, event.ctrlKey || event.metaKey);
       }}
-      onChange={handleChange}
-      langCode={langCode}
-      viewModeEnabled={locked}
-      onPaste={(data) =>
-        // Pasted iframes could carry foreign HTML; blocks only come from generation.
-        !(data.elements ?? []).some((e) => e.type === "iframe" || e.type === "embeddable")
-      }
-      UIOptions={{
-        canvasActions: {
-          loadScene: false,
-          saveToActiveFile: false,
-          export: false,
-          saveAsImage: false,
-        },
-      }}
-    />
+    >
+      <Excalidraw
+        excalidrawAPI={attach}
+        initialData={{
+          elements: (initial?.elements ?? []) as NonDeletedExcalidrawElement[],
+          files: (initial?.files ?? {}) as BinaryFiles,
+          appState: { viewBackgroundColor: "#f1f0ee" },
+          scrollToContent: true,
+        }}
+        onChange={handleChange}
+        langCode={langCode}
+        viewModeEnabled={locked}
+        onPaste={(data) =>
+          // Pasted iframes could carry foreign HTML; blocks only come from generation.
+          !(data.elements ?? []).some((e) => e.type === "iframe" || e.type === "embeddable")
+        }
+        UIOptions={{
+          canvasActions: {
+            loadScene: false,
+            saveToActiveFile: false,
+            export: false,
+            saveAsImage: false,
+          },
+        }}
+      />
+    </div>
   );
 }

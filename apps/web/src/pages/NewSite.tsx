@@ -5,6 +5,8 @@ import { Link } from "react-router";
 import { describeAction } from "@/actions/describe";
 import type { Action } from "@/actions/types";
 import { stepVersion, withNewVersion } from "@/canvas/blocks";
+import { partRects } from "@/canvas/partProbe";
+import { blockParts, hitPart, type Part } from "@/canvas/parts";
 import type { CanvasHandle, PageLayout, SelectedBlock, StrokesOver } from "@/canvas/SketchCanvas";
 import type { SketchBounds } from "@/canvas/shapes";
 import { ActionEditor } from "@/components/ActionEditor";
@@ -61,6 +63,17 @@ interface RefineTarget {
   returnTo: Mode;
 }
 
+/** A link/button inside a block, picked with Ctrl+click or from the panel. */
+interface PickedPart {
+  blockId: string;
+  partId: string | null;
+}
+
+interface ActionSubject {
+  block: SelectedBlock;
+  part: Part | null;
+}
+
 interface DrawOver {
   blockId: string;
   label: string;
@@ -80,7 +93,10 @@ export function NewSite() {
   const [pendingBlocks, setPendingBlocks] = useState<SelectedBlock[]>([]);
   const [drawOver, setDrawOver] = useState<DrawOver | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [actionFor, setActionFor] = useState<SelectedBlock | null>(null);
+  const [actionFor, setActionFor] = useState<ActionSubject | null>(null);
+  const [picked, setPicked] = useState<PickedPart | null>(null);
+  // Mirrors `picked` synchronously: a Ctrl+click records it before Excalidraw selects the block.
+  const pickedRef = useRef<PickedPart | null>(null);
   const [showSubmissions, setShowSubmissions] = useState(false);
   const [site, setSite] = useState<PageLayout | null>(null);
   const { state, generate, refine } = useGeneration();
@@ -257,15 +273,69 @@ export function NewSite() {
 
   const saveAction = (action: Action | null) => {
     if (!actionFor) return;
-    const current = canvas.current?.getBlock(actionFor.id);
-    if (current) canvas.current?.updateBlock(actionFor.id, { ...current.data, action });
+    const { block, part } = actionFor;
+    const current = canvas.current?.getBlock(block.id);
+    if (current) {
+      const data = current.data;
+      if (part) {
+        const { [part.id]: _old, ...others } = data.partActions;
+        const partActions = action ? { ...others, [part.id]: action } : others;
+        canvas.current?.updateBlock(block.id, { ...data, partActions });
+      } else {
+        canvas.current?.updateBlock(block.id, { ...data, action });
+      }
+    }
     setActionFor(null);
-    window.setTimeout(() => canvas.current?.select(actionFor.id), 0);
+    window.setTimeout(() => canvas.current?.select(block.id), 0);
   };
+
+  const pick = (next: PickedPart | null) => {
+    pickedRef.current = next;
+    setPicked(next);
+    canvas.current?.markPart(next?.blockId ?? null, next?.partId ?? null);
+  };
+
+  const clearPick = () => {
+    if (pickedRef.current) pick(null);
+  };
+
+  const onSelectBlock = (block: SelectedBlock | null) => {
+    setSelected(block);
+    if (!block || block.id !== pickedRef.current?.blockId) clearPick();
+  };
+
+  /** Ctrl/Cmd+click picks the link/button under the pointer; a plain click the whole block. */
+  const onCanvasPointerDown = async (clientX: number, clientY: number, withModifier: boolean) => {
+    if (mode !== "draw") return;
+    const hit = canvas.current?.pointAt(clientX, clientY);
+    if (!hit || !withModifier) {
+      clearPick();
+      return;
+    }
+    const { id, data, width, height } = hit.block;
+    pickedRef.current = { blockId: id, partId: null };
+    const partId = hitPart(await partRects(data, width, height), hit.x, hit.y);
+    // Ignore the answer if something else was picked or selected meanwhile.
+    if (pickedRef.current?.blockId === id) pick({ blockId: id, partId });
+  };
+
+  // The outline belongs to editing; leaving the drawing mode drops it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only reacts to mode changes
+  useEffect(() => {
+    if (mode !== "draw") clearPick();
+  }, [mode]);
 
   const busy = mode === "generating" || mode === "refining";
   const stage = state.phase === "working" ? state.stage : "uploading";
   const questions = pendingBlocks.filter((block) => block.data.question);
+  const selectedParts = selected ? blockParts(selected.data.html) : [];
+  const activePart =
+    picked && picked.blockId === selected?.id
+      ? (selectedParts.find((p) => p.id === picked.partId) ?? null)
+      : null;
+  const subjectAction = activePart
+    ? (selected?.data.partActions[activePart.id] ?? null)
+    : (selected?.data.action ?? null);
   const errorKey =
     error === "empty"
       ? "gen.empty"
@@ -321,7 +391,10 @@ export function NewSite() {
                 canvas.current = handle;
               }}
               onSketchCountChange={setSketchCount}
-              onSelectBlock={setSelected}
+              onSelectBlock={onSelectBlock}
+              onCanvasPointerDown={(x, y, withModifier) =>
+                void onCanvasPointerDown(x, y, withModifier)
+              }
               persist={mode !== "try"}
             />
           </Suspense>
@@ -390,10 +463,11 @@ export function NewSite() {
             <BlockPanel
               key={selected.id}
               block={selected}
-              actionSummary={
-                selected.data.action ? describeAction(selected.data.action, labelOf, t) : null
-              }
-              onAction={() => setActionFor(selected)}
+              parts={selectedParts}
+              activePart={activePart?.id ?? null}
+              onPickPart={(partId) => pick({ blockId: selected.id, partId })}
+              actionSummary={subjectAction ? describeAction(subjectAction, labelOf, t) : null}
+              onAction={() => setActionFor({ block: selected, part: activePart })}
               onRefine={(instruction) => void startRefine(selected, { instruction }, "draw")}
               onDrawOver={() => beginDrawOver(selected)}
               onAnswer={(option) => answer(selected, option, "draw")}
@@ -415,8 +489,9 @@ export function NewSite() {
 
       {actionFor ? (
         <ActionEditor
-          block={actionFor}
-          targets={(canvas.current?.allBlocks() ?? []).filter((b) => b.id !== actionFor.id)}
+          block={actionFor.block}
+          part={actionFor.part}
+          targets={(canvas.current?.allBlocks() ?? []).filter((b) => b.id !== actionFor.block.id)}
           labelOf={labelOf}
           onSave={saveAction}
           onClose={() => setActionFor(null)}

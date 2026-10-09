@@ -115,13 +115,27 @@ export const RUNTIME_JS = String.raw`(() => {
     a && (a.type === "link" ? typeof a.url === "string" && SAFE_URL.test(a.url)
       : a.type === "modal" || a.type === "toggle" || a.type === "scroll");
 
+  const parse = (json) => { try { return JSON.parse(json); } catch (_) { return null; } };
+  const PART = /^p\d{1,2}$/;
+
   document.addEventListener("click", (event) => {
-    // Only the block cell carries an action; markup inside a block cannot add its own.
+    // Actions live only on the block cell (its own, and by part id for the links and buttons
+    // inside it); markup inside a block cannot add its own.
     const cell = event.target.closest(".chz-cell");
-    if (!cell || !cell.dataset.chzAction) return;
-    event.preventDefault();
+    if (!cell) return;
+    // Links in blocks point nowhere ("#"); never jump to the top of the page.
+    if (event.target.closest("a")) event.preventDefault();
+    const part = event.target.closest("[data-chz-part]");
+    const partId = part && cell.contains(part) ? part.dataset.chzPart : "";
+    const parts = cell.dataset.chzParts ? parse(cell.dataset.chzParts) : null;
     let action = null;
-    try { action = JSON.parse(cell.dataset.chzAction); } catch (_) { return; }
+    if (parts && PART.test(partId) && Object.prototype.hasOwnProperty.call(parts, partId)) {
+      action = parts[partId];
+    } else if (cell.dataset.chzAction) {
+      action = parse(cell.dataset.chzAction);
+    }
+    if (!action) return;
+    event.preventDefault();
     if (valid(action)) run(action);
   });
 })();`;
