@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SceneElement } from "@/lib/scene";
-import { blockData, stepVersion, withNewVersion } from "./blocks";
+import { blockData, blockDataOf, stepVersion, withNewVersion } from "./blocks";
 import { overlaps } from "./shapes";
 
 const element = {
@@ -58,5 +58,35 @@ describe("overlaps", () => {
     expect(overlaps(block, { x: 50, y: 50, width: 80, height: 10 })).toBe(true);
     expect(overlaps(block, { x: 100, y: 0, width: 10, height: 10 })).toBe(false);
     expect(overlaps(block, { x: 200, y: 200, width: 10, height: 10 })).toBe(false);
+  });
+});
+
+describe("blockDataOf", () => {
+  it("upgrades blocks saved before versions and questions existed", () => {
+    const legacy = {
+      customData: {
+        chizma: {
+          elementId: "el_2",
+          kind: "illustration",
+          label: "sun",
+          html: "<svg></svg>",
+          css: "",
+          locale: "ru",
+          pending: false,
+        },
+      },
+    };
+
+    const data = blockDataOf(legacy);
+
+    expect(data?.versions).toEqual([{ html: "<svg></svg>", css: "" }]);
+    expect(data?.current).toBe(0);
+    expect(data?.question).toBeNull();
+    expect(data?.element.label).toBe("sun");
+  });
+
+  it("ignores elements that are not blocks", () => {
+    expect(blockDataOf({})).toBeNull();
+    expect(blockDataOf({ customData: { chizma: "oops" } })).toBeNull();
   });
 });
