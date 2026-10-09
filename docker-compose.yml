@@ -1,0 +1,31 @@
+# One-command self-hosting: `docker compose up --build`
+# Editor: http://localhost:8080/chizma/  API: http://localhost:8000/health
+services:
+  api:
+    build: ./apps/api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CHIZMA_DATABASE_URL: sqlite:////data/chizma.db
+      CHIZMA_CORS_ORIGINS: ${CHIZMA_CORS_ORIGINS:-http://localhost:8080}
+    ports:
+      - "${CHIZMA_API_PORT:-8000}:8000"
+    volumes:
+      - api-data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "${CHIZMA_WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  api-data:

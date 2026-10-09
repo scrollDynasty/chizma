@@ -60,8 +60,11 @@ void i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
-i18n.on("languageChanged", (lng) => {
+function syncDocumentLang(lng: string): void {
   if (typeof document !== "undefined") document.documentElement.lang = lng;
-});
+}
+
+syncDocumentLang(i18n.language);
+i18n.on("languageChanged", syncDocumentLang);
 
 export default i18n;
