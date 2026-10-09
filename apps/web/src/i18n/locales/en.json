@@ -10,5 +10,26 @@
     "ok": "Server: ok",
     "down": "Server unavailable"
   },
-  "language": "Language"
+  "language": "Language",
+  "nav": {
+    "signIn": "Sign in",
+    "signOut": "Sign out"
+  },
+  "login": {
+    "title": "Sign in to Chizma",
+    "subtitle": "No passwords: use your GitHub or Google account.",
+    "github": "Continue with GitHub",
+    "google": "Continue with Google",
+    "unavailable": "Sign-in is not configured on the server yet.",
+    "signingIn": "Signing you in…",
+    "back": "Back to sign in",
+    "errors": {
+      "not_allowed": "This account is not on the test list yet.",
+      "oauth_failed": "Sign-in was cancelled or failed. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "newSite": {
+    "title": "New site"
+  }
 }
