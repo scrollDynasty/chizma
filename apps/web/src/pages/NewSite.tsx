@@ -471,9 +471,11 @@ export function NewSite() {
               onRefine={(instruction) => void startRefine(selected, { instruction }, "draw")}
               onDrawOver={() => beginDrawOver(selected)}
               onAnswer={(option) => answer(selected, option, "draw")}
-              onStep={(delta) =>
-                canvas.current?.updateBlock(selected.id, stepVersion(selected.data, delta))
-              }
+              onStep={(delta) => {
+                // Another version has other markup: part ids may point elsewhere now.
+                clearPick();
+                canvas.current?.updateBlock(selected.id, stepVersion(selected.data, delta));
+              }}
             />
           ) : null}
 
