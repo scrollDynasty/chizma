@@ -4,11 +4,15 @@
 # and an OIDC identity so GitHub Actions can deploy without stored passwords.
 #
 # Requires: az (logged in: `az login`), gh (logged in), the GitHub repo already created.
-# Usage:   LOCATION=westeurope ./infra/azure/setup.sh
+# Usage:   LOCATION=germanywestcentral ./infra/azure/setup.sh
+#          (Azure for Students limits regions; see `az policy assignment list`.)
 set -euo pipefail
 
+# Git Bash on Windows rewrites arguments like /subscriptions/... into file paths.
+export MSYS_NO_PATHCONV=1
+
 REPO="${REPO:-scrollDynasty/chizma}"
-LOCATION="${LOCATION:-westeurope}"
+LOCATION="${LOCATION:-germanywestcentral}"
 RG="${RG:-chizma-rg}"
 PLAN="${PLAN:-chizma-plan}"
 APP="${APP:-chizma-api-$(openssl rand -hex 3)}"
@@ -17,6 +21,9 @@ WEB_ORIGIN="${WEB_ORIGIN:-https://scrolldynasty.github.io}"
 echo "==> Subscription: $(az account show --query name -o tsv)"
 SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 TENANT_ID="$(az account show --query tenantId -o tsv)"
+
+echo "==> Register the App Service resource provider (first use only)"
+az provider register --namespace Microsoft.Web --wait
 
 echo "==> Resource group $RG in $LOCATION"
 az group create --name "$RG" --location "$LOCATION" --output none
@@ -42,16 +49,26 @@ az webapp config appsettings set --name "$APP" --resource-group "$RG" --output n
   CHIZMA_AI_PROVIDER=fake
 
 echo "==> GitHub OIDC identity for deployments"
-CLIENT_ID="$(az ad app create --display-name "chizma-github-deploy" --query appId -o tsv)"
+CLIENT_ID="$(az ad app list --display-name "chizma-github-deploy" --query "[0].appId" -o tsv)"
+if [ -z "$CLIENT_ID" ]; then
+  CLIENT_ID="$(az ad app create --display-name "chizma-github-deploy" --query appId -o tsv)"
+fi
 az ad sp create --id "$CLIENT_ID" --output none 2>/dev/null || true
 WEBAPP_ID="$(az webapp show --name "$APP" --resource-group "$RG" --query id -o tsv)"
 az role assignment create --assignee "$CLIENT_ID" --role "Website Contributor" --scope "$WEBAPP_ID" --output none
-az ad app federated-credential create --id "$CLIENT_ID" --parameters "{
-  \"name\": \"github-main\",
-  \"issuer\": \"https://token.actions.githubusercontent.com\",
-  \"subject\": \"repo:$REPO:environment:azure-api\",
-  \"audiences\": [\"api://AzureADTokenExchange\"]
-}" --output none
+# GitHub may present either the name-based or the ID-based subject; trust both.
+OWNER_ID="$(gh api "repos/$REPO" --jq .owner.id)"
+REPO_ID="$(gh api "repos/$REPO" --jq .id)"
+OWNER="${REPO%%/*}"; NAME="${REPO##*/}"
+for subject in "repo:$REPO:environment:azure-api"                "repo:$OWNER@$OWNER_ID/$NAME@$REPO_ID:environment:azure-api"; do
+  cred_name="github-$(echo "$subject" | md5sum | cut -c1-8)"
+  az ad app federated-credential create --id "$CLIENT_ID" --parameters "{
+    \"name\": \"$cred_name\",
+    \"issuer\": \"https://token.actions.githubusercontent.com\",
+    \"subject\": \"$subject\",
+    \"audiences\": [\"api://AzureADTokenExchange\"]
+  }" --output none 2>/dev/null || echo "    (credential for $subject already exists)"
+done
 
 echo "==> GitHub repository variables (identifiers only, not secrets)"
 gh variable set AZURE_CLIENT_ID --repo "$REPO" --body "$CLIENT_ID"
