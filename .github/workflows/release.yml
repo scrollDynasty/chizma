@@ -22,12 +22,14 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      - name: Run CI on the release PR
-        if: steps.release.outputs.pr
+      - name: Run CI on the open release PR
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
-        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+        run: |
+          branch="$(gh pr list --repo "$GITHUB_REPOSITORY" --label "autorelease: pending"             --state open --json headRefName --jq '.[0].headRefName // empty')"
+          if [ -n "$branch" ]; then
+            gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+          fi
 
   images:
     needs: release-please
