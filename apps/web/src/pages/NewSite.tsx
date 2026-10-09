@@ -17,7 +17,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { fetchQuota } from "@/lib/api";
 import { GENERATION_STEPS, GenerationLoader, REFINE_STEPS } from "@/preview/GenerationLoader";
-import { useGeneration } from "@/preview/useGeneration";
+import { type GenerationState, useGeneration } from "@/preview/useGeneration";
 
 // Excalidraw is large; load it only on the editor page.
 const SketchCanvas = lazy(() => import("@/canvas/SketchCanvas"));
@@ -86,10 +86,19 @@ export function NewSite() {
   const { state, generate, refine } = useGeneration();
   const quota = useQuery({ queryKey: ["quota"], queryFn: ({ signal }) => fetchQuota(signal) });
 
+  // Each finished job is applied exactly once (not again on re-render or language change).
+  const handled = useRef<GenerationState | null>(null);
+  const language = useRef(i18n.language);
+  language.current = i18n.language;
+  // Set synchronously on click so a double click cannot start two paid jobs.
+  const starting = useRef(false);
+
   useEffect(() => {
-    if (state.phase === "done" || state.phase === "failed") {
-      void queryClient.invalidateQueries({ queryKey: ["quota"] });
-    }
+    if (state.phase !== "done" && state.phase !== "failed") return;
+    if (handled.current === state) return;
+    handled.current = state;
+    starting.current = false;
+    void queryClient.invalidateQueries({ queryKey: ["quota"] });
     if (state.phase === "failed") {
       setError(state.error);
       setMode(job.current === "refine" ? (refineTarget.current?.returnTo ?? "draw") : "draw");
@@ -120,14 +129,19 @@ export function NewSite() {
       setMode("draw");
       return;
     }
-    const added = canvas.current?.showResult(state.job, frame.current, i18n.language) ?? [];
+    const added = canvas.current?.showResult(state.job, frame.current, language.current) ?? [];
     setPendingBlocks(added);
     setMode("deciding");
-  }, [state, queryClient, i18n.language]);
+  }, [state, queryClient]);
 
   const startGeneration = async () => {
+    if (starting.current) return;
+    starting.current = true;
     const snapshot = await canvas.current?.snapshot();
-    if (!snapshot) return;
+    if (!snapshot) {
+      starting.current = false;
+      return;
+    }
     frame.current = snapshot.bounds;
     job.current = "generate";
     setError(null);
@@ -145,7 +159,12 @@ export function NewSite() {
     target: SelectedBlock,
     options: { instruction?: string; strokes?: StrokesOver | null; answered?: boolean },
     returnTo: Mode,
+    alreadyStarted = false,
   ) => {
+    if (!alreadyStarted) {
+      if (starting.current) return;
+      starting.current = true;
+    }
     refineTarget.current = {
       id: target.id,
       answered: options.answered ?? false,
@@ -184,6 +203,7 @@ export function NewSite() {
   };
 
   const tryAgain = async () => {
+    if (starting.current) return;
     canvas.current?.discardResult();
     setPendingBlocks([]);
     await startGeneration();
@@ -206,16 +226,17 @@ export function NewSite() {
     [...(canvas.current?.elementIds() ?? [])].filter((id) => !over.before.has(id));
 
   const applyDrawOver = async (instruction: string) => {
-    if (!drawOver) return;
+    if (!drawOver || starting.current) return;
+    starting.current = true;
     const target = canvas.current?.getBlock(drawOver.blockId);
     const strokes = await canvas.current?.strokesOver(drawOver.blockId, drawOver.before);
-    if (!target) return;
-    if (!strokes && !instruction) {
-      setError("nothing_drawn");
+    if (!target || (!strokes && !instruction)) {
+      starting.current = false;
+      if (target) setError("nothing_drawn");
       return;
     }
     setDrawOver(null);
-    await startRefine(target, { instruction, strokes }, "draw");
+    await startRefine(target, { instruction, strokes }, "draw", true);
   };
 
   const cancelDrawOver = () => {
@@ -301,6 +322,7 @@ export function NewSite() {
               }}
               onSketchCountChange={setSketchCount}
               onSelectBlock={setSelected}
+              persist={mode !== "try"}
             />
           </Suspense>
         </div>

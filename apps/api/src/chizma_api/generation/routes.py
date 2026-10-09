@@ -20,7 +20,14 @@ from pydantic import BaseModel, ValidationError
 
 from chizma_api.deps import CurrentUser, DbDep, SettingsDep
 from chizma_api.generation.jobs import Job, JobStore
-from chizma_api.generation.limits import QuotaError, RateLimiter, quota, record_spend, reserve
+from chizma_api.generation.limits import (
+    QuotaError,
+    RateLimiter,
+    quota,
+    record_spend,
+    release,
+    reserve,
+)
 from chizma_api.generation.pipeline import (
     InvalidModelOutputError,
     PipelineResult,
@@ -28,7 +35,13 @@ from chizma_api.generation.pipeline import (
     run_pipeline,
     run_refine,
 )
-from chizma_api.generation.providers import AIProvider, AIProviderError, RefineInput, SketchInput
+from chizma_api.generation.providers import (
+    AIProvider,
+    AIProviderError,
+    RefineInput,
+    SketchInput,
+    Usage,
+)
 from chizma_api.generation.schemas import LOCALES, Block, Element, SceneGraph
 
 log = logging.getLogger(__name__)
@@ -88,7 +101,7 @@ def _parse_shapes(raw: str) -> list[dict[str, Any]]:
     return shapes
 
 
-Work = Callable[[Callable[[str], None]], Awaitable[PipelineResult | RefineResult]]
+Work = Callable[[Callable[[str], None], Usage], Awaitable[PipelineResult | RefineResult]]
 
 
 async def _run_job(request: Request, job: Job, work: Work) -> None:
@@ -97,8 +110,26 @@ async def _run_job(request: Request, job: Job, work: Work) -> None:
     def set_stage(stage: str) -> None:
         job.stage = stage
 
+    usage = Usage()
     try:
-        result = await work(set_stage)
+        await _execute(request, job, work, set_stage, usage)
+    finally:
+        # Every model call costs money, also when the job failed after it.
+        try:
+            with request.app.state.session_factory() as db:
+                record_spend(db, usage.cost_usd)
+                if job.error == "ai_unavailable":
+                    release(db, job.user_id)
+                db.commit()
+        except Exception:
+            log.exception("could not record spend for %s", job.id)
+
+
+async def _execute(
+    request: Request, job: Job, work: Work, set_stage: Callable[[str], None], usage: Usage
+) -> None:
+    try:
+        result = await work(set_stage, usage)
     except AIProviderError as exc:
         log.warning("generation %s failed at provider: %s", job.id, exc)
         job.status, job.stage, job.error = "failed", "failed", "ai_unavailable"
@@ -112,9 +143,6 @@ async def _run_job(request: Request, job: Job, work: Work) -> None:
         job.status, job.stage, job.error = "failed", "failed", "internal_error"
         return
 
-    with request.app.state.session_factory() as db:
-        record_spend(db, result.usage.cost_usd)
-        db.commit()
     if isinstance(result, RefineResult):
         job.blocks = [result.block]
         elements = 1
@@ -174,7 +202,9 @@ async def start_generation(
         job.id, user.id, len(parsed_shapes), len(png) // 1024, provider.name,
     )  # fmt: skip
     sketch = SketchInput(png, parsed_shapes, width, height, locale)
-    background.add_task(_run_job, request, job, lambda stage: run_pipeline(provider, sketch, stage))
+    background.add_task(
+        _run_job, request, job, lambda stage, usage: run_pipeline(provider, sketch, stage, usage)
+    )
     return StartOut(id=job.id, status=job.status)
 
 
@@ -225,7 +255,9 @@ async def refine_block(
         png=png,
         shapes=parsed_shapes,
     )
-    background.add_task(_run_job, request, job, lambda stage: run_refine(provider, refine, stage))
+    background.add_task(
+        _run_job, request, job, lambda stage, usage: run_refine(provider, refine, stage, usage)
+    )
     return StartOut(id=job.id, status=job.status)
 
 

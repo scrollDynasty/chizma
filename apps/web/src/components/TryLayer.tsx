@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Action } from "@/actions/types";
+import { type Action, isSafeUrl } from "@/actions/types";
 import type { CanvasHandle } from "@/canvas/SketchCanvas";
 import { submitForm } from "@/lib/api";
 import { Dialog, inputClass } from "./Dialog";
@@ -38,7 +38,8 @@ export function TryLayer({ canvas }: { canvas: CanvasHandle }) {
   const run = (action: Action) => {
     switch (action.type) {
       case "link":
-        window.open(action.url, action.new_tab ? "_blank" : "_self", "noopener,noreferrer");
+        // Never navigate the editor itself: always a new tab, and only web/mail/phone links.
+        if (isSafeUrl(action.url)) window.open(action.url, "_blank", "noopener,noreferrer");
         return;
       case "modal":
         setModal(action);

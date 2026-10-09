@@ -1,4 +1,5 @@
 import type { BlockData } from "@/canvas/blocks";
+import { safeCss } from "./sandbox";
 
 /**
  * One self-contained document for one block. The block fills its frame exactly; the frame is a
@@ -14,7 +15,7 @@ export function buildBlockDocument(
   block: Pick<BlockData, "html" | "css" | "locale" | "label">,
   sanitizeHtml: (html: string) => string,
 ): string {
-  const css = block.css.replace(/<\/?style/gi, "");
+  const css = safeCss(block.css);
   return `<!doctype html>
 <html lang="${escapeText(block.locale)}">
 <head>

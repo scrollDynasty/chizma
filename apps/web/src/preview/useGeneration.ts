@@ -38,8 +38,18 @@ export function useGeneration() {
     try {
       const { id } = await start();
       const deadline = Date.now() + TIMEOUT_MS;
+      let misses = 0;
       while (alive()) {
-        const job = await fetchGeneration(id);
+        let job: GenerationJob;
+        try {
+          job = await fetchGeneration(id);
+          misses = 0;
+        } catch (error) {
+          // A network blip must not abandon a job that is already paid for.
+          if (error instanceof ApiError || ++misses > 3) throw error;
+          await sleep(POLL_MS);
+          continue;
+        }
         if (!alive()) return;
         if (job.status === "done") return setState({ phase: "done", job });
         if (job.status === "failed") {

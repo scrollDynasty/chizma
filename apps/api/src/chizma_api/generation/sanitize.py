@@ -45,6 +45,16 @@ _CSS_IMPORT = re.compile(r"@import[^;{}]*;?", re.I)
 _CSS_BANNED = re.compile(r"@import|expression\s*\(|javascript:|behavior\s*:|-moz-binding", re.I)
 
 
+def _balanced(css: str) -> bool:
+    depth = 0
+    for char in css:
+        depth += char == "{"
+        depth -= char == "}"
+        if depth < 0:
+            return False
+    return depth == 0
+
+
 def clean_css(css: str) -> str:
     """Keep plain CSS; drop imports, scripting hooks and non-data URLs."""
 
@@ -52,6 +62,8 @@ def clean_css(css: str) -> str:
         return match.group(0) if _DATA_IMAGE.match(match.group(2).strip()) else "none"
 
     css = css.replace("<", "").replace("\\", "")
+    if not _balanced(css):
+        return ""  # a stray "}" would escape the block's own scope and restyle the page
     css = _CSS_IMPORT.sub("", css)
     css = _CSS_URL.sub(keep_data_urls, css)
     return _CSS_BANNED.sub("", css)
@@ -60,8 +72,11 @@ def clean_css(css: str) -> str:
 def _clean_attr(tag: str, name: str, value: str) -> str | None:
     if name.startswith("aria-"):
         return value
-    if name.startswith("data-") and re.fullmatch(r"data-[a-z0-9-]{1,40}", name):
-        return value
+    if name.startswith("data-"):
+        # data-chz-* and data-el belong to the site runtime; blocks must not forge them.
+        if name == "data-el" or name.startswith("data-chz"):
+            return None
+        return value if re.fullmatch(r"data-[a-z0-9-]{1,40}", name) else None
     if name not in ALLOWED_ATTRS:
         return None
     if name == "href":

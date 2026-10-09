@@ -67,8 +67,10 @@ async def run_pipeline(
     provider: AIProvider,
     sketch: SketchInput,
     on_stage: Callable[[str], None] = lambda _: None,
+    usage: Usage | None = None,
 ) -> PipelineResult:
-    usage = Usage()
+    # Pass `usage` to keep counting spend even when a later step fails.
+    usage = usage if usage is not None else Usage()
 
     on_stage("recognizing")
     scene: SceneGraph | None = None
@@ -130,9 +132,10 @@ async def run_refine(
     provider: AIProvider,
     refine: RefineInput,
     on_stage: Callable[[str], None] = lambda _: None,
+    usage: Usage | None = None,
 ) -> RefineResult:
     """Regenerate one block from words and/or strokes drawn over it."""
-    usage = Usage()
+    usage = usage if usage is not None else Usage()
     on_stage("refining")
     feedback: str | None = None
     for _attempt in range(2):

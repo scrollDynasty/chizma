@@ -46,4 +46,11 @@ describe("fitToPage", () => {
     expect(patches.get(PAGE_ID)?.height).toBe(2340);
     expect(fitToPage([{ ...page, height: 3000 }]).get(PAGE_ID)?.height).toBe(MIN_PAGE_HEIGHT);
   });
+
+  it("settles strokes wider than the page instead of moving them back and forth", () => {
+    const first = fitToPage([page, item("line", "line", 100, 100, 1500, 0)]);
+    expect(first.get("line")).toEqual({ x: 0 });
+
+    expect(fitToPage([page, item("line", "line", 0, 100, 1500, 0)]).get("line")).toBeUndefined();
+  });
 });

@@ -76,3 +76,10 @@ def record_spend(db: Session, usd: float, now: float | None = None) -> None:
         db.add(spend)
     spend.usd += usd
     spend.generations += 1
+
+
+def release(db: Session, user_id: int, now: float | None = None) -> None:
+    """Give a generation back to the user when it failed for reasons outside their control."""
+    usage = db.get(GenerationUsage, (user_id, today(now)))
+    if usage and usage.count > 0:
+        usage.count -= 1

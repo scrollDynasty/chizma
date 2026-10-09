@@ -76,7 +76,10 @@ export function fitToPage(elements: readonly PageItem[]): Map<string, Patch> {
       width = page.width;
     }
     let shift = 0;
-    if (box.x < left) shift = left - box.x;
+    if (width > page.width) {
+      // Too wide to fit (a long line): align it to the left edge once, never ping-pong.
+      if (Math.abs(box.x - left) > 0.5) shift = left - box.x;
+    } else if (box.x < left) shift = left - box.x;
     else if (box.x + width > right) shift = right - (box.x + width);
     if (shift !== 0) patch.x = element.x + shift;
     if (box.y < page.y) patch.y = element.y + (page.y - box.y);

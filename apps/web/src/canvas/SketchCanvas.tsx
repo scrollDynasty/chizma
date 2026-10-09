@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GenerationJob } from "@/lib/scene";
 import { buildBlockDocument } from "@/preview/blockDocument";
 import { sanitizeBlockHtml, withCsp } from "@/preview/sandbox";
-import { type BlockData, blockDataOf, isBlock } from "./blocks";
+import { type BlockData, blockDataOf, HIDDEN_OPACITY_KEY, isBlock } from "./blocks";
 import { type Draft, loadDraft, saveDraft } from "./draft";
 import { fitToPage, isPage, newPage } from "./page";
 import {
@@ -105,6 +105,8 @@ interface Props {
   onSketchCountChange: (count: number) => void;
   /** Called when exactly one generated block is selected, or with null. */
   onSelectBlock: (block: SelectedBlock | null) => void;
+  /** False while the scene shows a temporary state (Try mode) that must not be saved. */
+  persist?: boolean;
 }
 
 /** Longest side sent to the vision model; larger images are downscaled anyway. */
@@ -120,8 +122,33 @@ const update: Update = (element, patch) =>
 /** Sanitised (DOMPurify) and CSP-locked document for one block. */
 const renderBlock = (data: BlockData) => withCsp(buildBlockDocument(data, sanitizeBlockHtml));
 
+/** Strokes still to be generated: not blocks, not the page, not strokes hidden behind a result. */
 const isSketch = (element: ExcalidrawElement) =>
-  !element.isDeleted && !isBlock(element) && !isPage(element);
+  !element.isDeleted &&
+  !isBlock(element) &&
+  !isPage(element) &&
+  element.customData?.[HIDDEN_OPACITY_KEY] === undefined;
+
+/**
+ * Saved or pasted data is untrusted: a block's document is always rebuilt by us from its
+ * (validated) data, and iframes that are not Chizma blocks are dropped.
+ */
+const trustedBlocks = (elements: readonly SceneItem[]) =>
+  elements.flatMap((element) => {
+    if (element.type !== "iframe" && element.type !== "embeddable") return [element];
+    const data = blockDataOf(element);
+    if (!data) return [];
+    return [
+      {
+        ...element,
+        customData: {
+          ...element.customData,
+          chizma: data,
+          generationData: { status: "done", html: renderBlock(data) },
+        },
+      },
+    ];
+  });
 
 /** Every drawing starts on a site page; older drafts get one. */
 const withPage = (elements: readonly SceneItem[]) =>
@@ -135,18 +162,24 @@ export default function SketchCanvas({
   onReady,
   onSketchCountChange,
   onSelectBlock,
+  persist = true,
 }: Props) {
   const [initial, setInitial] = useState<Draft | null | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const lastSelection = useRef("");
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
 
   useEffect(() => {
     void loadDraft().then((draft) => {
       if (!draft) return setInitial({ elements: withPage([]), files: {}, savedAt: Date.now() });
       // A result left undecided (tab closed) goes back to the drawing.
       const elements = discardResult(draft.elements as SceneItem[], (e, p) => ({ ...e, ...p }));
-      setInitial({ ...draft, elements: withPage(elements.filter((e) => !e.isDeleted)) });
+      setInitial({
+        ...draft,
+        elements: withPage(trustedBlocks(elements.filter((e) => !e.isDeleted))),
+      });
     });
     return () => window.clearTimeout(saveTimer.current);
   }, []);
@@ -271,9 +304,21 @@ export default function SketchCanvas({
         return hit && data ? { id: hit.id, data, width: hit.width, height: hit.height } : null;
       },
       setVisible: (id, visible) => {
-        const elements = current().map((element) =>
-          element.id === id ? update(element, { opacity: visible ? 100 : 0 }) : element,
-        );
+        // Remember the real opacity so it comes back exactly (and survives a reload).
+        const elements = current().map((element) => {
+          if (element.id !== id) return element;
+          const saved = element.customData?.[HIDDEN_OPACITY_KEY];
+          if (!visible) {
+            if (saved !== undefined) return element;
+            return update(element, {
+              opacity: 0,
+              customData: { ...element.customData, [HIDDEN_OPACITY_KEY]: element.opacity },
+            });
+          }
+          if (typeof saved !== "number") return element;
+          const { [HIDDEN_OPACITY_KEY]: _restored, ...rest } = element.customData ?? {};
+          return update(element, { opacity: saved, customData: rest });
+        });
         api.updateScene(replaceScene(elements, false));
       },
       pageLayout: () => {
@@ -357,6 +402,7 @@ export default function SketchCanvas({
       );
     }
     window.clearTimeout(saveTimer.current);
+    if (!persistRef.current) return;
     saveTimer.current = window.setTimeout(() => {
       void saveDraft({ elements, files, savedAt: Date.now() });
     }, SAVE_DELAY_MS);
@@ -374,6 +420,10 @@ export default function SketchCanvas({
       onChange={handleChange}
       langCode={langCode}
       viewModeEnabled={locked}
+      onPaste={(data) =>
+        // Pasted iframes could carry foreign HTML; blocks only come from generation.
+        !(data.elements ?? []).some((e) => e.type === "iframe" || e.type === "embeddable")
+      }
       UIOptions={{
         canvasActions: {
           loadScene: false,

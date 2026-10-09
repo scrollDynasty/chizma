@@ -66,3 +66,14 @@ def test_css_keeps_rules_but_not_imports_or_remote_urls() -> None:
     assert "@import" not in cleaned
     assert "https://" not in cleaned
     assert ".b{color:red}" in cleaned
+
+
+def test_blocks_cannot_forge_runtime_attributes() -> None:
+    html = '<span data-chz-action="{}" data-el="x" data-note="ok">hi</span>'
+
+    assert sanitize_fragment(html) == '<span data-note="ok">hi</span>'
+
+
+def test_unbalanced_css_is_dropped() -> None:
+    assert clean_css(".a{color:red}} body{display:none}") == ""
+    assert clean_css(".a{color:red}") == ".a{color:red}"
