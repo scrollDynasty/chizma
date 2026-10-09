@@ -26,3 +26,55 @@ body,
 body {
   @apply bg-background text-foreground font-sans antialiased;
 }
+
+/* Generation loader: a soft light sweep over the frozen canvas and a breathing orb. */
+.chz-loader {
+  background-image: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.55) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: chz-sweep 1.8s ease-in-out infinite;
+}
+
+.chz-orb {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #f59e0b, #fb7185, #8b5cf6, #22d3ee, #f59e0b);
+  animation:
+    chz-spin 2.4s linear infinite,
+    chz-breathe 1.8s ease-in-out infinite;
+  filter: blur(0.5px);
+}
+
+@keyframes chz-sweep {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes chz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes chz-breathe {
+  50% {
+    scale: 0.85;
+    opacity: 0.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chz-loader,
+  .chz-orb {
+    animation: none;
+  }
+}
