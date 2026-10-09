@@ -10,9 +10,14 @@ canvas (Excalidraw)
   -> vision model -> scene graph (JSON, validated against packages/scene-schema)
        element: { id, kind, label, bbox, confidence, style_hints, alternatives[] }
   -> block generator -> HTML/CSS/SVG per element (no JavaScript) -> server-side checks
-  -> page builder (layout from bboxes, responsive rules)
-  -> live preview in a sandboxed iframe
+  -> element boxes recomputed from the drawn shapes (1:1 with the sketch)
+  -> result shown in place of the sketch, in a sandboxed iframe of the same size
+  -> Back to drawing / Try again / Accept (accepted result kept in the browser for now)
 ```
+
+Generation is **1:1**: every drawn object becomes exactly one real element at the same place
+and size, and nothing is invented. People refine blocks afterwards (M2). The responsive page
+builder (`apps/web/src/preview/pageBuilder.ts`) is kept for publishing (M4).
 
 Every model response is validated against the JSON schema. On failure the request is retried once with the validation error; after that the user gets a clear error message.
 

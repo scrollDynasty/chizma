@@ -65,4 +65,13 @@ describe("simplifyShapes", () => {
     expect(boundsOf([line])).toEqual({ x: 10, y: 40, width: 40, height: 10 });
     expect(simplifyShapes([label]).shapes[0]?.text).toBe("Menu");
   });
+
+  it("can measure shapes against the visible canvas instead of the drawing", () => {
+    const frame = { x: 0, y: 0, width: 1000, height: 500 };
+
+    const { bounds, shapes } = simplifyShapes([rect], frame);
+
+    expect(bounds).toEqual(frame);
+    expect(shapes[0]).toMatchObject({ x: 100, y: 50, width: 200, height: 120 });
+  });
 });

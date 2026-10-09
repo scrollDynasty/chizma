@@ -110,7 +110,7 @@ def _render(shape: str, text: str | None, colors: list[str]) -> dict[str, str]:
     fill = colors[1] if len(colors) > 1 else "none"
     svg = (
         '<svg viewBox="0 0 100 100" width="100%" height="100%" '
-        'preserveAspectRatio="xMidYMid meet" role="img">{}</svg>'
+        'preserveAspectRatio="none" role="img">{}</svg>'
     )
     if shape == "text":
         return {
@@ -124,11 +124,14 @@ def _render(shape: str, text: str | None, colors: list[str]) -> dict[str, str]:
             f"border:2px solid {stroke};background:{'#f8fafc' if fill == 'none' else fill};}}",
         }
     if shape == "circle":
-        body = f'<circle cx="50" cy="50" r="46" fill="{fill}" stroke="{stroke}" stroke-width="3"/>'
+        body = (
+            f'<ellipse cx="50" cy="50" rx="47" ry="47" fill="{fill}" stroke="{stroke}" '
+            f'stroke-width="3" vector-effect="non-scaling-stroke"/>'
+        )
     elif shape == "diamond":
         body = (
             f'<polygon points="50,4 96,50 50,96 4,50" fill="{fill}" '
-            f'stroke="{stroke}" stroke-width="3"/>'
+            f'stroke="{stroke}" stroke-width="3" vector-effect="non-scaling-stroke"/>'
         )
     else:
         body = (

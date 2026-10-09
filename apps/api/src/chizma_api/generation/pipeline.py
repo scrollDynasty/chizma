@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from chizma_api.generation.providers import AIProvider, ModelReply, SketchInput, Usage
 from chizma_api.generation.sanitize import clean_css, sanitize_fragment
-from chizma_api.generation.schemas import Block, BlockSet, SceneGraph
+from chizma_api.generation.schemas import BBox, Block, BlockSet, SceneGraph
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +33,30 @@ def _short_error(exc: Exception) -> str:
     return str(exc).replace("\n", " ")[:600]
 
 
+def fit_to_shapes(scene: SceneGraph, sketch: SketchInput) -> SceneGraph:
+    """Place every element exactly over the shapes it came from.
+
+    The model decides what things are; where they are comes from the drawing itself, so
+    the result lands 1:1 on top of the sketch. Elements without known shapes keep the
+    model's estimate.
+    """
+    shapes = {str(shape.get("id")): shape for shape in sketch.shapes if "id" in shape}
+    width, height = max(sketch.width, 1.0), max(sketch.height, 1.0)
+    for element in scene.elements:
+        own = [shapes[i] for i in element.source_shape_ids if i in shapes]
+        if not own:
+            continue
+        try:
+            x1 = min(float(s["x"]) for s in own)
+            y1 = min(float(s["y"]) for s in own)
+            x2 = max(float(s["x"]) + float(s["width"]) for s in own)
+            y2 = max(float(s["y"]) + float(s["height"]) for s in own)
+        except (KeyError, TypeError, ValueError):
+            continue
+        element.bbox = BBox(x=x1 / width, y=y1 / height, w=(x2 - x1) / width, h=(y2 - y1) / height)
+    return scene
+
+
 async def run_pipeline(
     provider: AIProvider,
     sketch: SketchInput,
@@ -54,6 +78,7 @@ async def run_pipeline(
             log.warning("invalid scene graph from %s: %s", provider.name, feedback)
     if scene is None:
         raise InvalidModelOutputError("scene graph")
+    scene = fit_to_shapes(scene, sketch)
 
     if not scene.elements:
         return PipelineResult(scene=scene, blocks=[], usage=usage)

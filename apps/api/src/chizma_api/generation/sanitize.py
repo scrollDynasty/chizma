@@ -36,7 +36,7 @@ ALLOWED_ATTRS = {
     "x", "y", "x1", "y1", "x2", "y2", "points", "transform", "opacity", "fill-opacity",
     "stroke-opacity", "offset", "stop-color", "stop-opacity", "gradientunits",
     "gradienttransform", "preserveaspectratio", "font-size", "font-family", "font-weight",
-    "text-anchor", "dominant-baseline", "fill-rule", "clip-rule",
+    "text-anchor", "dominant-baseline", "fill-rule", "clip-rule", "vector-effect",
 }  # fmt: skip
 
 _DATA_IMAGE = re.compile(r"^data:image/(png|jpeg|gif|webp);base64,[a-z0-9+/=\s]+$", re.I)

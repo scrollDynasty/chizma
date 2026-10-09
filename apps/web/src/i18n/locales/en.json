@@ -36,8 +36,6 @@
     "generate": "Generate",
     "home": "Home",
     "loading": "Loading the canvas…",
-    "previewTitle": "Preview",
-    "previewEmpty": "Draw anything (a house, a sun, a few boxes) and press “Generate”.",
     "savedLocally": "Your drawing is saved in this browser."
   },
   "gen": {
@@ -62,5 +60,13 @@
       "timeout": "Generation took too long. Try again.",
       "generic": "Something went wrong. Try again."
     }
+  },
+  "result": {
+    "back": "Back to drawing",
+    "again": "Try again",
+    "accept": "Accept",
+    "accepted": "Accepted",
+    "edit": "Edit drawing",
+    "unsure": "Not sure about: {{list}}"
   }
 }

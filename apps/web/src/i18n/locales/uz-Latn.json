@@ -36,8 +36,6 @@
     "generate": "Yaratish",
     "home": "Bosh sahifa",
     "loading": "Chizish maydoni yuklanmoqda…",
-    "previewTitle": "Ko‘rinish",
-    "previewEmpty": "Istalgan narsani chizing (uy, quyosh, bir nechta to‘rtburchak) va «Yaratish»ni bosing.",
     "savedLocally": "Chizma shu brauzerda saqlanadi."
   },
   "gen": {
@@ -62,5 +60,13 @@
       "timeout": "Yaratish juda uzoq davom etdi. Qayta urinib ko‘ring.",
       "generic": "Nimadir xato ketdi. Qayta urinib ko‘ring."
     }
+  },
+  "result": {
+    "back": "Chizmaga qaytish",
+    "again": "Yana bir bor",
+    "accept": "Qabul qilish",
+    "accepted": "Qabul qilindi",
+    "edit": "Chizmani o‘zgartirish",
+    "unsure": "Ishonchim komil emas: {{list}}"
   }
 }
