@@ -67,17 +67,27 @@ export const RUNTIME_JS = `(() => {
       trap.className = "chz-hp";
       trap.setAttribute("aria-hidden", "true");
       trap.addEventListener("input", () => { values._hp = trap.value; });
+      // Sent by script, never as an HTML form submission: sandboxed previews block those,
+      // and the site never navigates away.
       const submit = el("button", "chz-submit", form.submit_label);
-      submit.type = "submit";
+      submit.type = "button";
       const status = el("p", "chz-status");
       node.append(trap, submit, status);
-      node.addEventListener("submit", (event) => {
-        event.preventDefault();
+      const go = () => {
+        if (submit.disabled || !node.reportValidity()) return;
         submit.disabled = true;
         send(form.id, values).then((ok) => {
           if (ok) node.replaceWith(el("p", "chz-success", form.success_text));
           else { status.textContent = "!"; submit.disabled = false; }
         });
+      };
+      submit.addEventListener("click", go);
+      node.addEventListener("submit", (event) => event.preventDefault());
+      node.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && event.target.tagName === "INPUT") {
+          event.preventDefault();
+          go();
+        }
       });
       dialog.append(node);
     }
